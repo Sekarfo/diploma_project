@@ -1,0 +1,74 @@
+{
+  "feature_columns": [
+    "bm25_score",
+    "normalized_bm25_score",
+    "exact_skill_overlap_count",
+    "exact_skill_overlap_ratio",
+    "title_token_overlap_ratio",
+    "years_experience_estimate"
+  ],
+  "feature_clean_report": {
+    "bm25_score": {
+      "original_non_null": 2000,
+      "non_null_after_numeric": 2000,
+      "null_count_after_numeric": 0,
+      "fill_value": 141.59600382541905
+    },
+    "normalized_bm25_score": {
+      "original_non_null": 2000,
+      "non_null_after_numeric": 2000,
+      "null_count_after_numeric": 0,
+      "fill_value": 0.8824904426748177
+    },
+    "exact_skill_overlap_count": {
+      "original_non_null": 2000,
+      "non_null_after_numeric": 2000,
+      "null_count_after_numeric": 0,
+      "fill_value": 25.0
+    },
+    "exact_skill_overlap_ratio": {
+      "original_non_null": 2000,
+      "non_null_after_numeric": 2000,
+      "null_count_after_numeric": 0,
+      "fill_value": 0.2526315789473684
+    },
+    "title_token_overlap_ratio": {
+      "original_non_null": 2000,
+      "non_null_after_numeric": 2000,
+      "null_count_after_numeric": 0,
+      "fill_value": 1.0
+    },
+    "years_experience_estimate": {
+      "original_non_null": 2000,
+      "non_null_after_numeric": 2000,
+      "null_count_after_numeric": 0,
+      "fill_value": 3.0
+    }
+  },
+  "summary": {
+    "raw_rows": 2000,
+    "usable_rows": 2000,
+    "raw_jobs": 20,
+    "usable_jobs": 20,
+    "raw_label_distribution": {
+      "0": 764,
+      "1": 1236
+    },
+    "usable_label_distribution": {
+      "0": 764,
+      "1": 1236
+    },
+    "jobs_with_only_one_label": 0
+  },
+  "fold_metrics_mean": {
+    "fold": 2.0,
+    "rows": 666.6666666666666,
+    "jobs": 6.666666666666667,
+    "model_ndcg@10": 0.8988144371425196,
+    "model_precision@10": 0.8857142857142857,
+    "model_recall@10": 0.14451602625995766,
+    "baseline_ndcg@10": 0.8366620781738244,
+    "baseline_precision@10": 0.8174603174603176,
+    "baseline_recall@10": 0.13246813405182248
+  }
+}
