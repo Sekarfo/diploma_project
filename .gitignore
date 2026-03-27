@@ -6,6 +6,7 @@ __pycache__/
 
 # Virtual environments
 .venv/
+.venv_app/
 venv/
 
 # Tool caches
@@ -31,10 +32,11 @@ Thumbs.db
 # Local runtime outputs
 *.log
 *.tmp
+.env
 
-# Model and generated artifacts
+.uv-python 
 
 
-# Generated datasets / predictions
 data/labels/labeled_pairs_first*.csv
 data/labels/*_smoke.csv
+data/processed/dataset_outputs/csv/candidate_pairs_auto.csv

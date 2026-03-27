@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HR Shortlist Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/ui/styles.css" />
+  </head>
+  <body>
+    <div class="page-bg"></div>
+
+    <section id="auth-screen" class="auth-screen">
+      <article class="auth-card">
+        <p class="eyebrow">Decision Support MVP</p>
+        <h1>HR Shortlist Studio</h1>
+        <p class="auth-intro">
+          Sign in to your HR account to create shortlists, track history, and review model insights.
+        </p>
+
+        <div class="auth-tabs">
+          <button id="auth-mode-signin" type="button" class="chip-btn active">Sign In</button>
+          <button id="auth-mode-signup" type="button" class="chip-btn">Sign Up</button>
+        </div>
+
+        <form id="signin-form" class="form-grid">
+          <label class="field">
+            <span>Email</span>
+            <input id="signin-email" type="email" placeholder="hr@company.com" required />
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input id="signin-password" type="password" placeholder="********" required />
+          </label>
+          <button class="action-btn" type="submit">Sign In</button>
+        </form>
+
+        <form id="signup-form" class="form-grid hidden">
+          <label class="field">
+            <span>Full Name</span>
+            <input id="signup-fullname" type="text" placeholder="Aruzhan HR" required />
+          </label>
+          <label class="field">
+            <span>Email</span>
+            <input id="signup-email" type="email" placeholder="hr@company.com" required />
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input id="signup-password" type="password" placeholder="Minimum 8 chars" required />
+          </label>
+          <button class="action-btn" type="submit">Create Account</button>
+        </form>
+
+        <p id="auth-status" class="mini-muted">Use your HR credentials to continue.</p>
+      </article>
+    </section>
+
+    <section id="app-shell" class="app-shell hidden">
+      <header class="app-topbar">
+        <div>
+          <p class="eyebrow">Decision Support MVP</p>
+          <h2>HR Shortlist Studio</h2>
+        </div>
+        <div class="topbar-actions">
+          <div class="user-pill">
+            <b id="topbar-user-name">-</b>
+            <span id="topbar-user-email">-</span>
+          </div>
+          <button id="signout-btn" type="button" class="chip-btn">Sign Out</button>
+        </div>
+      </header>
+
+      <nav class="app-nav">
+        <button id="page-shortlist-btn" type="button" class="nav-btn active">Shortlist Candidates</button>
+        <button id="page-profile-btn" type="button" class="nav-btn">My Profile</button>
+        <button id="page-insights-btn" type="button" class="nav-btn">Model Insights (SHAP)</button>
+      </nav>
+
+      <p id="app-status" class="status"></p>
+
+      <main class="page-stack">
+        <section id="page-shortlist" class="page active">
+          <div class="shortlist-layout">
+            <article class="panel control-panel">
+              <div class="section-head">
+                <h3>Create Shortlist</h3>
+                <div id="dataset-stats" class="dataset-stats">
+                  <p class="stat-chip">Jobs: <span id="stats-jobs">-</span></p>
+                  <p class="stat-chip">Resumes: <span id="stats-resumes">-</span></p>
+                </div>
+              </div>
+
+              <div class="mode-toggle">
+                <button id="mode-existing" class="chip-btn active" type="button">Use Existing Vacancy</button>
+                <button id="mode-custom" class="chip-btn" type="button">Add Vacancy</button>
+              </div>
+
+              <form id="existing-form" class="form-grid">
+                <label class="field">
+                  <span>Vacancy</span>
+                  <select id="job-select" required></select>
+                </label>
+                <div class="row-2">
+                  <label class="field field-inline">
+                    <span>Top K</span>
+                    <input id="existing-topk" type="number" min="1" max="200" value="20" />
+                  </label>
+                  <label class="field field-inline">
+                    <span>Candidate Pool</span>
+                    <input id="existing-num-candidates" type="number" min="1" max="5000" value="100" />
+                  </label>
+                </div>
+                <button class="action-btn" type="submit">Build Shortlist</button>
+              </form>
+
+              <form id="custom-form" class="form-grid hidden">
+                <label class="field">
+                  <span>Vacancy Title</span>
+                  <input id="vacancy-title" type="text" placeholder="Senior Data Scientist" required />
+                </label>
+                <label class="field">
+                  <span>Vacancy Description</span>
+                  <textarea id="vacancy-description" rows="6" placeholder="Paste vacancy text here..." required></textarea>
+                </label>
+                <div class="row-2">
+                  <label class="field">
+                    <span>Years Required (optional)</span>
+                    <input id="vacancy-years" type="number" min="0" max="60" step="0.5" placeholder="3" />
+                  </label>
+                  <label class="field">
+                    <span>Skills CSV (optional)</span>
+                    <input id="vacancy-skills" type="text" placeholder="python, sql, spark" />
+                  </label>
+                </div>
+                <div class="row-2">
+                  <label class="field field-inline">
+                    <span>Top K</span>
+                    <input id="custom-topk" type="number" min="1" max="200" value="20" />
+                  </label>
+                  <label class="field field-inline">
+                    <span>Candidate Pool</span>
+                    <input id="custom-num-candidates" type="number" min="1" max="5000" value="100" />
+                  </label>
+                </div>
+                <button class="action-btn" type="submit">Build Shortlist</button>
+              </form>
+            </article>
+
+            <article class="panel results-panel">
+              <div class="section-head">
+                <h3>Top Candidates</h3>
+                <p id="results-meta" class="mini-muted">Build a shortlist to see ranked candidates.</p>
+              </div>
+
+              <p class="formula-note">
+                Final fused relevance score = 0.3 x normalized retrieval score + 0.7 x normalized reranker score
+              </p>
+
+              <div id="results" class="candidate-list empty-state">
+                <p>No shortlist yet.</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section id="page-profile" class="page hidden">
+          <div class="profile-layout">
+            <article class="panel">
+              <div class="section-head">
+                <h3>My Profile</h3>
+              </div>
+              <div class="profile-grid">
+                <p><b>Name:</b> <span id="profile-user-name">-</span></p>
+                <p><b>Email:</b> <span id="profile-user-email">-</span></p>
+                <p><b>Role:</b> <span id="profile-user-role">-</span></p>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="section-head inline-actions">
+                <h3>Vacancies I Added</h3>
+                <button id="vacancies-refresh" class="chip-btn" type="button">Refresh</button>
+              </div>
+              <div id="vacancy-list" class="list-shell">
+                <p class="mini-muted">No vacancies yet.</p>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="section-head inline-actions">
+                <h3>Shortlist History</h3>
+                <button id="history-refresh" class="chip-btn" type="button">Refresh</button>
+              </div>
+              <div id="history-list" class="list-shell">
+                <p class="mini-muted">No shortlist history yet.</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section id="page-insights" class="page hidden">
+          <article class="panel insights-panel">
+            <div class="section-head">
+              <h3>How To Read SHAP (For HR Team)</h3>
+            </div>
+            <div class="insight-cards">
+              <article class="insight-card">
+                <h4>What this page answers</h4>
+                <p>
+                  It shows which factors most often move candidates up or down in ranking across validation data.
+                </p>
+              </article>
+              <article class="insight-card">
+                <h4>How to interpret bars</h4>
+                <p>
+                  Larger mean |SHAP| means stronger influence. It is not "good" or "bad" alone, it means importance.
+                </p>
+              </article>
+              <article class="insight-card">
+                <h4>HR usage guideline</h4>
+                <p>
+                  Use SHAP as transparency support, but make final hiring decisions with human review and interview evidence.
+                </p>
+              </article>
+            </div>
+
+            <div class="section-head">
+              <h3>Global Model Explanation (Validation SHAP)</h3>
+              <p id="global-explainer-meta" class="mini-muted">Loading SHAP summary...</p>
+            </div>
+
+            <div id="global-shap-list" class="global-shap-list"></div>
+
+            <details class="feature-glossary">
+              <summary>Feature Glossary</summary>
+              <div id="feature-glossary-list" class="feature-glossary-list"></div>
+            </details>
+          </article>
+        </section>
+      </main>
+    </section>
+
+    <template id="candidate-template">
+      <article class="candidate-card">
+        <div class="candidate-top">
+          <div>
+            <p class="rank-pill"></p>
+            <h3 class="resume-id"></h3>
+          </div>
+          <button class="view-resume-btn" type="button">View Resume</button>
+        </div>
+
+        <div class="score-grid">
+          <div class="score-chip main">
+            <span>Final Fused Relevance</span>
+            <b class="score-fused">-</b>
+          </div>
+          <div class="score-chip">
+            <span>Normalized Retrieval</span>
+            <b class="score-retrieval">-</b>
+          </div>
+          <div class="score-chip">
+            <span>Normalized Reranker</span>
+            <b class="score-reranker">-</b>
+          </div>
+        </div>
+
+        <p class="candidate-summary"></p>
+
+        <details class="candidate-more">
+          <summary>More details</summary>
+          <div class="details-grid"></div>
+        </details>
+      </article>
+    </template>
+
+    <div id="resume-modal" class="resume-modal hidden">
+      <div id="resume-modal-backdrop" class="resume-modal-backdrop"></div>
+      <article class="resume-modal-card" role="dialog" aria-modal="true" aria-labelledby="resume-modal-title">
+        <header class="resume-modal-head">
+          <h3 id="resume-modal-title">Resume</h3>
+          <button id="resume-modal-close" type="button" class="chip-btn">Close</button>
+        </header>
+        <pre id="resume-modal-text" class="resume-modal-text"></pre>
+      </article>
+    </div>
+
+    <script src="/ui/app.js"></script>
+  </body>
+</html>

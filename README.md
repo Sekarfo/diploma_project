@@ -1,75 +1,102 @@
-# Job-Resume Matching MVP
+# Job-Resume Shortlisting MVP
 
-Simple end-to-end MVP for matching resumes to a job description using a trained XGBoost ranker.
+This project keeps a strict 2-stage pipeline:
 
-## What this project does
+1. Stage 1 retrieval: Sentence-BERT embeddings + Elasticsearch kNN.
+2. Stage 2 ranking: interpretable feature rebuild + trained `XGBRanker`.
 
-1. Accepts a job title and job description.
-2. Loads local candidate resumes from a JSON file.
-3. Builds lightweight ranking features.
-4. Runs a trained XGBoost ranking model.
-5. Returns top candidates with:
-   - baseline score/rank
-   - ML score/rank
-   - short explanation
 
-This project is intentionally MVP-sized:
+`data/raw/resume_data.csv` is a resume-job paired table.  
+The same resume can appear in many rows with different paired jobs.
 
-## Project structure
+So preprocessing intentionally builds:
 
-- `backend/app/api` -> FastAPI routes (`/health`, `/rank-candidates`, `/match-job`)
-- `backend/app/services` -> business logic (ranking, feature building, matching flow)
-- `backend/app/config` -> constants and local paths
-- `backend/app/repositories` -> local candidate loading
-- `backend/app/schemas` -> request/response models
-- `backend/data/candidates.json` -> local demo candidate dataset
-- `backend/examples/*.json` -> example request payloads
-- `backend/scripts/demo_match_job.py` -> human-readable demo runner
-- `models/ranker_model.json` -> trained ranker artifact
-- `data/train_ranker.py` -> model training script (already completed)
+- one canonical `resumes_clean` table (unique resumes),
+- one canonical `jobs_clean` table,
+- one `observed_pairs` table from raw `matched_score`.
 
-## Quick start
+This prevents data leakage into retrieval while preserving supervision for training.
 
-## 1) Create and activate virtual environment
+## Clean Data Pipeline
 
-Windows PowerShell:
+Run from repository root:
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
+python scripts/build_resume_job_dataset.py
+
+#Build Sentence-BERT embeddings for jobs/resumes
+python scripts/build_embedding.py
+
+# Build auto-labeled pair dataset for ranker training
+python scripts/build_ml_training_from_weak_labels.py
+
+# Train ranker
+python scripts/Train_ranker.py
+
+# Rebuild Elasticsearch resume index from latest embeddings
+python scripts/index_resumes_elasticsearch.py --recreate-index
 ```
 
-## 2) Install minimal dependencies
+Main outputs:
+
+- `data/processed/dataset_outputs/jobs_clean.csv`
+- `data/processed/dataset_outputs/resumes_clean.csv`
+- `data/processed/dataset_outputs/csv/observed_pairs.csv`
+- `data/processed/dataset_outputs/csv/candidate_pairs_auto.csv`
+- `data/processed/dataset_outputs/csv/ml_training_template.csv` (always)
+- `data/processed/dataset_outputs/parquet/ml_training_template.parquet` (when `pyarrow` is available)
+- `models/xgb_ranker.joblib`
+- `models/ranker_features.joblib`
+
+## Runtime Flow
+
+`job_id` -> load job + embedding -> Elasticsearch top-K retrieval -> rebuild ranking features -> `XGBRanker` score -> final shortlist JSON.
+
+The API only serves inference. It does not retrain, re-embed, or re-index during requests.
+
+## Main Endpoints
+
+- `GET /health`
+- `GET /stats`
+- `GET /jobs`
+- `GET /jobs/{job_id}`
+- `POST /auth/signup`
+- `POST /auth/signin`
+- `GET /auth/me`
+- `POST /auth/signout`
+- `POST /shortlist`
+- `POST /shortlist/vacancy`
+- `GET /cabinet/history`
+- `GET /cabinet/history/{run_id}`
+
+`/shortlist` and `/shortlist/vacancy` now require Bearer auth and are saved to HR cabinet history.
+
+## Environment and Dependencies
+
+1. Fill `.env` in repo root (`DATABASE_URL`, `AUTH_PASSWORD_PEPPER`, Elasticsearch settings).
+2. Install backend dependencies:
 
 ```powershell
-pip install fastapi uvicorn pandas xgboost
+pip install -r backend/requirements.txt
 ```
 
-## 3) Run API
-
-From repository root:
+## Run API
 
 ```powershell
 python backend/run_api.py
 ```
 
-API will run on `http://127.0.0.1:8000`.
+API URL: `http://127.0.0.1:8000`  
+Swagger docs: `http://127.0.0.1:8000/docs`  
+HR UI: `http://127.0.0.1:8000/ui`
 
-## Main endpoints
+## Runtime CLI
 
-- `GET /health`
-- `POST /rank-candidates` (precomputed features in request)
-- `POST /match-job` (full local MVP flow)
+```powershell
+python scripts/rerank_candidates_elasticsearch.py --job-id job_ext_00003 --top-k 20 --num-candidates 100
+```
 
-Interactive docs:
-- `http://127.0.0.1:8000/docs`
+Default outputs:
 
-## Demo the full flow (`/match-job`)
-
-
-## Notes
-
-- The ranker model is loaded from `models/ranker_model.json`.
-- Candidate data is local file-based (`backend/data/candidates.json`).
-- If you change candidate data, rerun the same `/match-job` request to see ranking changes.
-
+- `data/processed/final_shortlist_<job_id>.csv`
+- `data/processed/final_shortlist_<job_id>.json`
