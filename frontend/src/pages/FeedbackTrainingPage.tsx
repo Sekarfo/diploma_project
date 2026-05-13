@@ -18,10 +18,7 @@ export function FeedbackTrainingPage(): JSX.Element {
 
   const saveMutation = useMutation({
     mutationFn: (payload: { recordId: string; decision: "Approve" | "Reject"; reason: string }) =>
-      api.feedback.update(payload.recordId, {
-        decision: payload.decision,
-        reason: payload.reason
-      }),
+      api.feedback.update(payload.recordId, { decision: payload.decision, reason: payload.reason }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["feedback"] });
       queryClient.invalidateQueries({ queryKey: ["shortlists"] });
@@ -31,97 +28,99 @@ export function FeedbackTrainingPage(): JSX.Element {
 
   const retrainMutation = useMutation({
     mutationFn: (recordId: string) => api.feedback.sendToRetraining(recordId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["feedback"] });
-    }
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["feedback"] })
   });
 
   return (
-    <section className="page-stack">
-      <div className="panel-head">
-        <h1>Feedback & Training</h1>
-      </div>
-      <section className="panel">
-        <table className="data-table">
+    <section className="screen is-active">
+      <header className="screen-header">
+        <div>
+          <h1 className="screen-title">feedback &amp; training</h1>
+          <p className="screen-sub">reviewer decisions feed back into the next ranker version</p>
+        </div>
+        <div className="row">
+          <button type="button" className="btn btn-primary">⇡ trigger retraining</button>
+        </div>
+      </header>
+      <hr className="screen-divider" />
+
+      <div className="panel">
+        <div className="panel-header">
+          <h2 className="panel-title">labelled decisions</h2>
+          <span className="mono-mute">{editableRows.length} records</span>
+        </div>
+        <table className="tbl">
           <thead>
             <tr>
               <th>Candidate</th>
               <th>Decision</th>
               <th>Reason</th>
               <th>Vacancy</th>
-              <th>Model Version</th>
+              <th>Model</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {editableRows.map((record) => {
-              const draft = drafts[record.id] ?? {
-                decision: record.decision,
-                reason: record.reason
-              };
-
+              const draft = drafts[record.id] ?? { decision: record.decision, reason: record.reason };
               return (
                 <tr key={record.id}>
                   <td>
-                    <div>{record.candidate.fullName}</div>
-                    <small className="muted">{formatDate(record.updatedAt)}</small>
+                    <div className="pipeline-name">{record.candidate.fullName}</div>
+                    <div className="muted">{formatDate(record.updatedAt)}</div>
                   </td>
                   <td>
                     <select
+                      className="field"
+                      style={{ width: 120 }}
                       value={draft.decision}
-                      onChange={(event) =>
+                      onChange={(e) =>
                         setDrafts((prev) => ({
                           ...prev,
-                          [record.id]: {
-                            ...draft,
-                            decision: event.target.value as "Approve" | "Reject"
-                          }
+                          [record.id]: { ...draft, decision: e.target.value as "Approve" | "Reject" }
                         }))
                       }
                     >
-                      <option value="Approve">Approve</option>
-                      <option value="Reject">Reject</option>
+                      <option value="Approve">approve</option>
+                      <option value="Reject">reject</option>
                     </select>
                   </td>
                   <td>
                     <input
-                      type="text"
+                      className="field"
                       value={draft.reason}
-                      onChange={(event) =>
+                      onChange={(e) =>
                         setDrafts((prev) => ({
                           ...prev,
-                          [record.id]: {
-                            ...draft,
-                            reason: event.target.value
-                          }
+                          [record.id]: { ...draft, reason: e.target.value }
                         }))
                       }
                     />
                   </td>
                   <td>{record.vacancy.title}</td>
-                  <td>{record.modelVersion}</td>
+                  <td><code>{record.modelVersion}</code></td>
                   <td>
-                    <div className="table-actions">
+                    <div className="row">
                       <button
                         type="button"
-                        className="table-action"
+                        className="btn btn-ghost btn-sm"
                         onClick={() =>
-                          saveMutation.mutate({
-                            recordId: record.id,
-                            decision: draft.decision,
-                            reason: draft.reason
-                          })
+                          saveMutation.mutate({ recordId: record.id, decision: draft.decision, reason: draft.reason })
                         }
                       >
-                        Edit labels
+                        [edit labels]
                       </button>
                       <button
                         type="button"
-                        className="table-action"
+                        className="btn btn-secondary btn-sm"
                         disabled={record.sentToRetraining}
                         onClick={() => retrainMutation.mutate(record.id)}
                       >
-                        {record.sentToRetraining ? "Queued" : "Send to retraining pipeline"}
+                        {record.sentToRetraining ? (
+                          <span className="badge badge-warning">queued</span>
+                        ) : (
+                          "[send to retrain]"
+                        )}
                       </button>
                     </div>
                   </td>
@@ -130,8 +129,7 @@ export function FeedbackTrainingPage(): JSX.Element {
             })}
           </tbody>
         </table>
-      </section>
+      </div>
     </section>
   );
 }
-

@@ -1,9 +1,7 @@
-from .matching import CANDIDATES_DATA_PATH, SKILL_KEYWORDS
-from .ranking import FEATURE_COLUMNS, RANKER_MODEL_PATH
+from .settings import EXPECTED_RANKER_FEATURES, Settings, get_settings
 
 __all__ = [
-    "FEATURE_COLUMNS",
-    "RANKER_MODEL_PATH",
-    "CANDIDATES_DATA_PATH",
-    "SKILL_KEYWORDS",
+    "Settings",
+    "get_settings",
+    "EXPECTED_RANKER_FEATURES",
 ]

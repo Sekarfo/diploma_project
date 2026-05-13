@@ -23,42 +23,54 @@ export function ProcessingPage(): JSX.Element {
   const job = query.data;
 
   if (!job) {
-    return <section className="panel loading-state">Processing job not found.</section>;
+    return <section className="screen is-active"><p className="mono-mute">Processing job not found.</p></section>;
   }
 
   const progress = Math.round(job.steps.reduce((acc, step) => acc + step.progress, 0) / job.steps.length);
 
   return (
-    <section className="page-stack">
-      <div className="panel-head">
-        <h1>Processing</h1>
-        <span className="muted">Queue depth: {job.queueDepth}</span>
-      </div>
+    <section className="screen is-active">
+      <header className="screen-header">
+        <div>
+          <h1 className="screen-title">processing</h1>
+          <p className="screen-sub">queue depth: {job.queueDepth}</p>
+        </div>
+      </header>
+      <hr className="screen-divider" />
 
       <ProgressTracker steps={job.steps} />
 
-      <section className="panel processing-summary">
-        <h3>{job.completed ? "Shortlist Ready" : "Background pipeline in progress"}</h3>
-        <p className="muted">
-          {job.completed
-            ? "Parsing, search, scoring, and ranking are complete. Candidate shortlist is ready for review."
-            : `Current completion: ${progress}%. This screen polls the job state to reflect async queue updates.`}
-        </p>
-        {job.completed ? (
-          <button
-            type="button"
-            className="primary-button"
-            onClick={() => {
-              setActiveProcessingJobId(null);
-              setSelectedVacancyId(job.vacancyId);
-              navigate(`/shortlists?vacancy=${job.vacancyId}`);
-            }}
-          >
-            Open Shortlist
-          </button>
-        ) : null}
-      </section>
+      <div style={{ height: 24 }} />
+
+      <div className="panel">
+        <div className="panel-header">
+          <h2 className="panel-title">
+            {job.completed ? "shortlist ready" : "background pipeline in progress"}
+          </h2>
+          <span className="mono-mute">{progress}% complete</span>
+        </div>
+        <div className="panel-body">
+          <p className="muted">
+            {job.completed
+              ? "Parsing, search, scoring, and ranking are complete. Candidate shortlist is ready for review."
+              : "This screen polls the job state to reflect async queue updates."}
+          </p>
+          {job.completed ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ marginTop: 16 }}
+              onClick={() => {
+                setActiveProcessingJobId(null);
+                setSelectedVacancyId(job.vacancyId);
+                navigate(`/shortlists?vacancy=${job.vacancyId}`);
+              }}
+            >
+              open shortlist →
+            </button>
+          ) : null}
+        </div>
+      </div>
     </section>
   );
 }
-

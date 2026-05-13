@@ -9,25 +9,33 @@ export function CandidatesPage(): JSX.Element {
   });
 
   return (
-    <section className="page-stack">
-      <div className="panel-head">
-        <h1>Candidates</h1>
-      </div>
+    <section className="screen is-active">
+      <header className="screen-header">
+        <div>
+          <h1 className="screen-title">candidates</h1>
+          <p className="screen-sub">all resumes parsed across active vacancies</p>
+        </div>
+      </header>
+      <hr className="screen-divider" />
+
       <div className="card-grid">
         {(query.data ?? []).map((candidate) => (
-          <article className="panel candidate-directory-card" key={candidate.id}>
-            <h4>{candidate.fullName}</h4>
-            <p className="muted">
+          <div className="cand-card" key={candidate.id}>
+            <div className="cand-name">{candidate.fullName}</div>
+            <div className="cand-meta">
               {candidate.headline} · {candidate.experienceYears}y · {candidate.location}
-            </p>
-            <p>{candidate.skills.slice(0, 5).join(" · ")}</p>
-            <Link className="text-link" to={`/candidates/${candidate.id}`}>
-              View profile
-            </Link>
-          </article>
+            </div>
+            <div className="cand-skills">
+              {candidate.skills.slice(0, 5).map((skill) => (
+                <span key={skill} className="cand-skill">{skill}</span>
+              ))}
+            </div>
+            <div className="cand-actions">
+              <Link className="link-cli" to={`/candidates/${candidate.id}`}>view profile</Link>
+            </div>
+          </div>
         ))}
       </div>
     </section>
   );
 }
-

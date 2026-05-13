@@ -2,10 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
-import { ScoreBadge } from "../components/common/ScoreBadge";
 import { ExplanationPanel } from "../components/common/ExplanationPanel";
 import { CandidateCard } from "../components/candidates/CandidateCard";
 import { useUiStore } from "../store/useUiStore";
+
+function scoreBar(score: number): { on: number; off: number } {
+  const filled = Math.round((score / 100) * 10);
+  return { on: filled, off: 10 - filled };
+}
 
 export function ShortlistsPage(): JSX.Element {
   const queryClient = useQueryClient();
@@ -33,9 +37,8 @@ export function ShortlistsPage(): JSX.Element {
       setSelectedVacancyId(vacancyIdFromUrl);
       return;
     }
-
     if (!selectedVacancyId) {
-      const readyVacancy = vacancyQuery.data?.find((vacancy) => vacancy.status === "READY");
+      const readyVacancy = vacancyQuery.data?.find((v) => v.status === "READY");
       if (readyVacancy) {
         setSelectedVacancyId(readyVacancy.id);
         setSearchParams({ vacancy: readyVacancy.id }, { replace: true });
@@ -53,115 +56,123 @@ export function ShortlistsPage(): JSX.Element {
     }
   });
 
+  const selectedVacancy = vacancyQuery.data?.find((v) => v.id === selectedVacancyId);
+
   return (
-    <section className="page-stack">
-      <div className="panel-head">
-        <h1>Shortlists</h1>
-        <div className="controls-inline">
-          <label>
-            Vacancy
+    <section className="screen is-active">
+      <header className="screen-header">
+        <div>
+          <h1 className="screen-title">shortlists</h1>
+          <p className="screen-sub">ranker output — top fits per vacancy with SHAP explanation</p>
+        </div>
+        <div className="row">
+          <label className="field-inline mono-mute">
+            vacancy:&nbsp;
             <select
+              className="field"
+              style={{ width: 220 }}
               value={selectedVacancyId ?? ""}
-              onChange={(event) => {
-                const value = event.target.value || null;
+              onChange={(e) => {
+                const value = e.target.value || null;
                 setSelectedVacancyId(value);
-                if (value) {
-                  setSearchParams({ vacancy: value }, { replace: true });
-                }
+                if (value) setSearchParams({ vacancy: value }, { replace: true });
               }}
             >
-              {(vacancyQuery.data ?? []).map((vacancy) => (
-                <option key={vacancy.id} value={vacancy.id}>
-                  {vacancy.title}
-                </option>
+              {(vacancyQuery.data ?? []).map((v) => (
+                <option key={v.id} value={v.id}>{v.title}</option>
               ))}
             </select>
           </label>
-          <label>
-            Min score
+          <div className="slider-row">
+            <span className="mono-mute">min score</span>
             <input
               type="range"
+              className="slider"
               min={40}
               max={95}
               value={minScoreThreshold}
-              onChange={(event) => setMinScoreThreshold(Number(event.target.value))}
+              onChange={(e) => setMinScoreThreshold(Number(e.target.value))}
             />
-            <span>{minScoreThreshold}%</span>
-          </label>
+            <span className="num" style={{ minWidth: 36 }}>{minScoreThreshold}%</span>
+          </div>
         </div>
-      </div>
+      </header>
+      <hr className="screen-divider" />
 
-      <section className="panel">
-        <table className="data-table">
+      <div className="panel">
+        <div className="panel-header">
+          <h2 className="panel-title">ranking · {selectedVacancy?.title ?? "—"}</h2>
+          <span className="mono-mute">{shortlistQuery.data?.length ?? 0} candidates above threshold</span>
+        </div>
+        <table className="tbl">
           <thead>
             <tr>
               <th>Candidate</th>
-              <th>Match Score</th>
-              <th>Skills Match</th>
+              <th className="num">Match</th>
+              <th className="num">Skills</th>
               <th>Experience</th>
               <th>Explanation</th>
               <th>Action</th>
             </tr>
           </thead>
           <tbody>
-            {(shortlistQuery.data ?? []).map((entry) => (
-              <tr key={`${entry.vacancyId}-${entry.candidateId}`}>
-                <td>{entry.candidate.fullName}</td>
-                <td>
-                  <ScoreBadge score={entry.matchScore} />
-                </td>
-                <td>{entry.skillsMatch.toFixed(1)}%</td>
-                <td>{entry.candidate.experienceYears}y</td>
-                <td>{entry.explanation}</td>
-                <td>
-                  <div className="table-actions">
-                    <button
-                      type="button"
-                      className="table-action"
-                      onClick={() =>
-                        decisionMutation.mutate({
-                          candidateId: entry.candidateId,
-                          decision: "approved"
-                        })
-                      }
-                    >
-                      Approve
-                    </button>
-                    <button
-                      type="button"
-                      className="table-action danger"
-                      onClick={() =>
-                        decisionMutation.mutate({
-                          candidateId: entry.candidateId,
-                          decision: "rejected"
-                        })
-                      }
-                    >
-                      Reject
-                    </button>
-                    <Link className="text-link" to={`/candidates/${entry.candidateId}`}>
-                      View profile
-                    </Link>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {(shortlistQuery.data ?? []).map((entry) => {
+              const { on, off } = scoreBar(entry.matchScore);
+              return (
+                <tr key={`${entry.vacancyId}-${entry.candidateId}`}>
+                  <td>{entry.candidate.fullName}</td>
+                  <td>
+                    <div className="score">
+                      <span className="score-bar">
+                        <span className="on">{"█".repeat(on)}</span>
+                        {off > 0 && <span className="off">{"─".repeat(off)}</span>}
+                      </span>
+                      <span className="num">{entry.matchScore.toFixed(1)}%</span>
+                    </div>
+                  </td>
+                  <td className="num">{entry.skillsMatch.toFixed(1)}%</td>
+                  <td>{entry.candidate.experienceYears}y</td>
+                  <td className="muted">{entry.explanation}</td>
+                  <td>
+                    <div className="row">
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => decisionMutation.mutate({ candidateId: entry.candidateId, decision: "approved" })}
+                      >
+                        [approve]
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-sm"
+                        onClick={() => decisionMutation.mutate({ candidateId: entry.candidateId, decision: "rejected" })}
+                      >
+                        [reject]
+                      </button>
+                      <Link className="link-cli" to={`/candidates/${entry.candidateId}`}>view</Link>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
-      </section>
+      </div>
 
-      <section className="candidate-cards-grid">
+      <div style={{ height: 32 }} />
+
+      <div className="card-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
         {(shortlistQuery.data ?? []).slice(0, 4).map((entry) => (
-          <div key={`${entry.vacancyId}-${entry.candidateId}`} className="stack-sm">
+          <div key={`${entry.vacancyId}-${entry.candidateId}`} className="stack-16">
             <CandidateCard entry={entry} />
             <ExplanationPanel
-              title="SHAP-based factors"
+              title="shap-based factors"
               summary={entry.explanation}
               factors={entry.explanationFactors}
             />
           </div>
         ))}
-      </section>
+      </div>
     </section>
   );
 }

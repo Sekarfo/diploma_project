@@ -1,198 +1,122 @@
 from __future__ import annotations
 
-import math
-import re
-from collections import Counter
-from typing import Iterable
+from typing import Any
 
+import numpy as np
 import pandas as pd
 
-from backend.app.config import SKILL_KEYWORDS
-
-TOKEN_PATTERN = re.compile(r"c\+\+|c#|\.net|[a-z0-9]+(?:[+#.][a-z0-9]+)*")
-YEARS_SINGLE_PATTERN = re.compile(r"\b(\d{1,2})\+?\s*(?:years?|yrs?)\b")
-DATE_RANGE_PATTERN = re.compile(r"\b((?:19|20)\d{2})\s*-\s*((?:19|20)\d{2})\b")
-STOPWORDS = {
-    "a",
-    "an",
-    "and",
-    "are",
-    "as",
-    "at",
-    "be",
-    "by",
-    "for",
-    "from",
-    "in",
-    "is",
-    "it",
-    "of",
-    "on",
-    "or",
-    "that",
-    "the",
-    "to",
-    "with",
-    "experience",
-    "years",
-    "year",
-    "role",
-    "job",
-}
-
-
-def _normalize_text(text: str | None) -> str:
-    return str(text or "").lower().strip()
-
-
-def _tokenize(text: str) -> list[str]:
-    return TOKEN_PATTERN.findall(_normalize_text(text))
-
-
-def _extract_years_experience(text: str) -> float:
-    normalized = _normalize_text(text)
-    estimates: list[float] = []
-
-    for years in YEARS_SINGLE_PATTERN.findall(normalized):
-        value = int(years)
-        if 0 <= value <= 50:
-            estimates.append(float(value))
-
-    for start, end in DATE_RANGE_PATTERN.findall(normalized):
-        low = int(start)
-        high = int(end)
-        if 1900 <= low <= 2100 and 1900 <= high <= 2100 and high >= low:
-            estimates.append(float(high - low))
-
-    return max(estimates) if estimates else 0.0
-
-
-def _extract_skill_tokens(tokens: Iterable[str]) -> set[str]:
-    token_set = set(tokens)
-    keyword_tokens = set()
-    for keyword in SKILL_KEYWORDS:
-        pieces = _tokenize(keyword)
-        if not pieces:
-            continue
-        if len(pieces) == 1 and pieces[0] in token_set:
-            keyword_tokens.add(pieces[0])
-        elif all(piece in token_set for piece in pieces):
-            keyword_tokens.update(pieces)
-
-    heuristic_tokens = {
-        t for t in token_set
-        if t not in STOPWORDS and len(t) > 2 and any(ch.isalpha() for ch in t)
-    }
-    return keyword_tokens | heuristic_tokens
-
-
-def _extract_keyword_skills(text: str) -> set[str]:
-    normalized = _normalize_text(text)
-    matched: set[str] = set()
-    for skill in SKILL_KEYWORDS:
-        skill_l = skill.lower()
-        if skill_l in normalized:
-            matched.add(skill_l)
-    return matched
-
-
-def _bm25_scores(query_tokens: list[str], document_tokens: list[list[str]]) -> list[float]:
-    if not query_tokens or not document_tokens:
-        return [0.0 for _ in document_tokens]
-
-    n_docs = len(document_tokens)
-    avg_doc_len = sum(len(doc) for doc in document_tokens) / max(1, n_docs)
-    k1 = 1.5
-    b = 0.75
-
-    df = Counter()
-    for doc in document_tokens:
-        df.update(set(doc))
-
-    query_counts = Counter(query_tokens)
-    scores: list[float] = []
-
-    for doc in document_tokens:
-        doc_tf = Counter(doc)
-        doc_len = len(doc)
-        score = 0.0
-        for token, qf in query_counts.items():
-            n = df.get(token, 0)
-            idf = math.log(1.0 + (n_docs - n + 0.5) / (n + 0.5))
-            tf = doc_tf.get(token, 0)
-            if tf == 0:
-                continue
-            numerator = tf * (k1 + 1.0)
-            denominator = tf + k1 * (1.0 - b + b * (doc_len / max(avg_doc_len, 1e-9)))
-            score += qf * idf * (numerator / denominator)
-        scores.append(float(score))
-    return scores
+from backend.app.services.artifact_service import RuntimeArtifacts
+from backend.app.services.errors import RankingError
+from backend.app.services.runtime_utils import parse_list_col, title_overlap_ratio, to_float
+from src.ml.features import engineer_features
 
 
 class FeatureBuilderService:
-    """Builds ranker-compatible features from a job text and local candidate set."""
+    """Builds runtime ranker features that match training schema exactly.
 
-    def build_candidate_features(
+    Cross-encoder is used only OFFLINE for label generation (data/generate_labels.py).
+    Inference path is structured-features-only: ES retrieve -> LightGBM rank.
+    """
+
+    def build_features_for_hits(
         self,
-        job_title: str,
-        job_description: str,
-        candidates_df: pd.DataFrame,
+        *,
+        artifacts: RuntimeArtifacts,
+        job_row: pd.Series,
+        job_vector: np.ndarray,
+        hits: list[dict[str, Any]],
+        allow_elastic_score_fallback: bool = False,
     ) -> pd.DataFrame:
-        if candidates_df.empty:
-            raise ValueError("No candidates available to build features.")
+        rows: list[dict[str, Any]] = []
+        missing_resume_ids: list[str] = []
 
-        if "resume_text" not in candidates_df.columns:
-            raise ValueError("candidates_df must include resume_text column.")
+        job_id = str(job_row["job_id"])
+        job_skills = set(parse_list_col(job_row.get("job_skills_norm", [])))
+        job_years_required = to_float(job_row.get("job_years_required", 0.0), default=0.0)
+        job_title = str(job_row.get("job_title", ""))
 
-        job_text = f"{job_title} {job_description}".strip()
-        job_tokens = _tokenize(job_text)
-        title_tokens = [t for t in _tokenize(job_title) if t not in STOPWORDS]
-        job_skill_tokens = _extract_skill_tokens(job_tokens)
-        job_keyword_skills = _extract_keyword_skills(job_text)
+        for retrieval_rank, hit in enumerate(hits, start=1):
+            src = hit.get("_source", {}) or {}
+            resume_id = str(src.get("resume_id") or hit.get("_id") or "").strip()
+            if not resume_id:
+                continue
 
-        candidate_tokens = [
-            _tokenize(f"{row.get('skills_text', '')} {row.get('resume_text', '')}")
-            for row in candidates_df.to_dict(orient="records")
-        ]
-        bm25 = _bm25_scores(job_tokens, candidate_tokens)
+            resume_idx = artifacts.resume_index_by_id.get(resume_id)
+            elastic_score = to_float(hit.get("retrieval_score_raw", hit.get("_score", 0.0)), default=0.0)
+            embedding_source = "local_embedding"
 
-        bm25_min = min(bm25) if bm25 else 0.0
-        bm25_max = max(bm25) if bm25 else 0.0
-        if bm25_max > bm25_min:
-            normalized_bm25 = [(s - bm25_min) / (bm25_max - bm25_min) for s in bm25]
-        else:
-            normalized_bm25 = [0.0 for _ in bm25]
+            if resume_idx is None:
+                missing_resume_ids.append(resume_id)
+                if not allow_elastic_score_fallback:
+                    continue
 
-        rows = []
-        for idx, candidate in enumerate(candidates_df.to_dict(orient="records")):
-            tokens = candidate_tokens[idx]
-            token_set = set(tokens)
-            candidate_skill_tokens = _extract_skill_tokens(tokens)
-            overlap_tokens = job_skill_tokens & candidate_skill_tokens
-            candidate_keyword_skills = _extract_keyword_skills(
-                f"{candidate.get('skills_text', '')} {candidate.get('resume_text', '')}"
-            )
-            matched_skills = sorted(job_keyword_skills & candidate_keyword_skills)
+                embedding_cosine = elastic_score
+                embedding_source = "elastic_score_fallback"
+                resume_skills = set(parse_list_col(src.get("resume_skills_norm", [])))
+                resume_titles = parse_list_col(src.get("resume_titles_norm", []))
+                resume_years_experience = to_float(src.get("resume_years_experience", 0.0), default=0.0)
+                resume_text = str(src.get("resume_text", "") or "")
+            else:
+                resume_row = artifacts.resumes_df.iloc[resume_idx]
+                embedding_cosine = float(
+                    np.dot(job_vector, artifacts.resume_embeddings[resume_idx])
+                )
+                resume_skills = set(parse_list_col(resume_row.get("resume_skills_norm", [])))
+                resume_titles = parse_list_col(resume_row.get("resume_titles_norm", []))
+                resume_years_experience = to_float(
+                    resume_row.get("resume_years_experience", 0.0),
+                    default=0.0,
+                )
+                resume_text = str(resume_row.get("resume_text", "") or "")
 
-            overlap_count = len(overlap_tokens)
-            overlap_ratio = overlap_count / len(job_skill_tokens) if job_skill_tokens else 0.0
-            title_overlap_ratio = (
-                len(set(title_tokens) & token_set) / len(set(title_tokens))
-                if title_tokens else 0.0
-            )
-            years = _extract_years_experience(candidate.get("resume_text", ""))
+            skill_overlap_count = int(len(job_skills & resume_skills))
+            skill_overlap_ratio = float(skill_overlap_count / max(len(job_skills), 1))
+            years_gap = float(resume_years_experience - job_years_required)
+            experience_match_flag = 1 if years_gap >= 0 else 0
+            current_title_overlap = title_overlap_ratio(job_title, resume_titles)
+
+            matched_skills = sorted(job_skills & resume_skills)
+            missing_skills = sorted(job_skills - resume_skills)
+            if experience_match_flag == 1:
+                experience_summary = f"Meets required experience (+{years_gap:.2f} years)."
+            else:
+                experience_summary = f"Below required experience ({years_gap:.2f} years)."
 
             rows.append(
                 {
-                    **candidate,
-                    "bm25_score": float(bm25[idx]),
-                    "normalized_bm25_score": float(normalized_bm25[idx]),
-                    "exact_skill_overlap_count": float(overlap_count),
-                    "exact_skill_overlap_ratio": float(overlap_ratio),
-                    "title_token_overlap_ratio": float(title_overlap_ratio),
-                    "years_experience_estimate": float(years),
-                    "matched_skills": matched_skills,
+                    "job_id": job_id,
+                    "resume_id": resume_id,
+                    "resume_text": resume_text,
+                    "retrieval_rank": retrieval_rank,
+                    "elastic_score": elastic_score,
+                    "retrieval_score_raw": elastic_score,
+                    "embedding_source": embedding_source,
+                    "embedding_cosine": embedding_cosine,
+                    "skill_overlap_count": skill_overlap_count,
+                    "skill_overlap_ratio": skill_overlap_ratio,
+                    "title_overlap_ratio": current_title_overlap,
+                    "resume_years_experience": resume_years_experience,
+                    "job_years_required": job_years_required,
+                    "years_gap": years_gap,
+                    "experience_match_flag": experience_match_flag,
+                    "matched_skills": matched_skills[:10],
+                    "missing_skills": missing_skills[:10],
+                    "experience_summary": experience_summary,
+                    "title_summary": f"Title overlap ratio {current_title_overlap:.2f}.",
                 }
             )
 
-        return pd.DataFrame(rows)
+        if missing_resume_ids and not allow_elastic_score_fallback:
+            missing_preview = ", ".join(sorted(set(missing_resume_ids))[:10])
+            raise RankingError(
+                "Retrieved resume_ids missing in local embeddings. Reindex Elasticsearch from current artifacts "
+                "or enable fallback mode. Missing ids sample: "
+                f"{missing_preview}"
+            )
+
+        if not rows:
+            return pd.DataFrame(rows)
+
+        base_df = pd.DataFrame(rows)
+        engineered_df = engineer_features(base_df)
+        return engineered_df

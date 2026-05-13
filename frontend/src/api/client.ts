@@ -1,26 +1,32 @@
 import type { AppSettings, FeedbackRecord, Vacancy } from "../types";
 import {
   createVacancy,
-  generateShortlist,
   getAnalyticsSummary,
-  getCandidateProfile,
   getDashboardSummary,
+  listShortlistCandidates,
+  listVacancies,
+  signoutUser,
+} from "./realServer";
+import {
+  generateShortlist,
+  getCandidateProfile,
   getProcessingJob,
   getSettings,
   getVacancy,
   listCandidates,
   listFeedbackRecords,
   listIntegrations,
-  listShortlistCandidates,
-  listVacancies,
   sendFeedbackToRetraining,
   updateFeedbackRecord,
   updateSettings,
   updateShortlistDecision,
-  updateVacancy
+  updateVacancy,
 } from "./mockServer";
 
 export const api = {
+  auth: {
+    signout: signoutUser,
+  },
   vacancies: {
     list: listVacancies,
     get: getVacancy,
@@ -32,21 +38,21 @@ export const api = {
         weights?: Vacancy["weights"];
       }
     ) => updateVacancy(vacancyId, updates),
-    generateShortlist
+    generateShortlist,
   },
   processing: {
-    get: getProcessingJob
+    get: getProcessingJob,
   },
   dashboard: {
-    summary: getDashboardSummary
+    summary: getDashboardSummary,
   },
   shortlists: {
     list: listShortlistCandidates,
-    setDecision: updateShortlistDecision
+    setDecision: updateShortlistDecision,
   },
   candidates: {
     list: listCandidates,
-    getProfile: getCandidateProfile
+    getProfile: getCandidateProfile,
   },
   feedback: {
     list: listFeedbackRecords,
@@ -54,17 +60,16 @@ export const api = {
       recordId: string,
       payload: Pick<FeedbackRecord, "decision" | "reason">
     ) => updateFeedbackRecord(recordId, payload),
-    sendToRetraining: sendFeedbackToRetraining
+    sendToRetraining: sendFeedbackToRetraining,
   },
   analytics: {
-    summary: getAnalyticsSummary
+    summary: getAnalyticsSummary,
   },
   integrations: {
-    list: listIntegrations
+    list: listIntegrations,
   },
   settings: {
     get: getSettings,
-    update: (patch: Partial<AppSettings>) => updateSettings(patch)
-  }
+    update: (patch: Partial<AppSettings>) => updateSettings(patch),
+  },
 };
-

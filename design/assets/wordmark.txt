@@ -1,0 +1,22 @@
+opencode block-pixel wordmark
+
+Five-row, monospaced. Each glyph is 5 rows tall × 5 cells wide
+with single-cell tracking between letters. Renders correctly in
+any monospaced face (Berkeley Mono, JetBrains Mono, etc).
+
+ ████  █████  █████  █   █   ████   ████   █████   █████
+█    █ █    █ █      ██  █  █      █    █  █    █  █    
+█    █ █████  ████   █ █ █  █      █    █  █    █  ████ 
+█    █ █      █      █  ██  █      █    █  █    █  █    
+ ████  █      █████  █   █   ████   ████   █████   █████
+
+Use as plain text inside a <pre> tag with:
+  font-family: var(--font-mono);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--color-ink);     /* on cream */
+  /* OR */
+  color: var(--color-on-dark); /* inside the hero TUI mockup */
+
+Do NOT vectorize this into an SVG logo. The wordmark IS ASCII.

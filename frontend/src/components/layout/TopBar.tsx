@@ -1,31 +1,36 @@
-import { useQuery } from "@tanstack/react-query";
-import { api } from "../../api/client";
+import { useNavigate } from "react-router-dom";
+import { signoutUser } from "../../api/realServer";
+import { useAuthStore } from "../../store/useAuthStore";
 
 export function TopBar(): JSX.Element {
-  const { data } = useQuery({
-    queryKey: ["dashboard", "summary", "topbar"],
-    queryFn: api.dashboard.summary,
-    refetchInterval: 3000
-  });
+  const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  const clearAuth = useAuthStore((s) => s.clearAuth);
 
-  const processingCount =
-    data?.pipeline.filter((item) => item.status === "PROCESSING").length ?? 0;
-  const queueState = processingCount > 0 ? "Processing jobs running" : "Queue healthy";
+  async function handleSignout(): Promise<void> {
+    await signoutUser();
+    clearAuth();
+    navigate("/login", { replace: true });
+  }
+
+  const displayName = user?.full_name?.split(" ")[0]?.toLowerCase() ?? "guest";
+  const role = user?.role ?? "hr";
 
   return (
-    <header className="topbar">
-      <div className="topbar-status">
-        <span className={`status-dot ${processingCount > 0 ? "status-dot-busy" : "status-dot-ok"}`} />
-        <span>{queueState}</span>
+    <div className="statusbar">
+      <div className="status-cell">
+        <span className="status-dot" />
+        <span className="status-value">selects. · live</span>
       </div>
-      <div className="topbar-user">
-        <button type="button" className="ghost-button">
-          Alerts
-          <span className="topbar-count">{processingCount}</span>
-        </button>
-        <div className="user-pill">A</div>
+      <div className="status-cell">
+        <span className="status-label">model:</span>
+        <span className="status-value">lgbm-ranker</span>
       </div>
-    </header>
+      <div className="status-spacer" />
+      <button type="button" className="icon-btn" onClick={handleSignout}>
+        <span>{displayName}</span>
+        <span className="status-label">@{role} · sign out</span>
+      </button>
+    </div>
   );
 }
-

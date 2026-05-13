@@ -1,42 +1,65 @@
 import { NavLink } from "react-router-dom";
-import clsx from "clsx";
 
-const navItems = [
+const pipelineNav = [
   { label: "Dashboard", to: "/", end: true },
   { label: "Vacancies", to: "/vacancies" },
   { label: "Candidates", to: "/candidates" },
   { label: "Shortlists", to: "/shortlists" },
+];
+
+const modelNav = [
   { label: "Analytics", to: "/analytics" },
   { label: "Feedback & Training", to: "/feedback-training" },
   { label: "Integrations", to: "/integrations" },
-  { label: "Settings", to: "/settings" }
+  { label: "Settings", to: "/settings" },
 ];
+
+function NavItem({ label, to, end }: { label: string; to: string; end?: boolean }): JSX.Element {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) => `nav-item${isActive ? " is-active" : ""}`}
+    >
+      {({ isActive }) => (
+        <>
+          <span className="nav-glyph">{isActive ? "[x]" : "[+]"}</span>
+          <span>{label}</span>
+          <span className="nav-count" />
+        </>
+      )}
+    </NavLink>
+  );
+}
 
 export function Sidebar(): JSX.Element {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-logo">TR</div>
-        <div>
-          <p className="brand-title">TalentRank</p>
-          <p className="brand-subtitle">Screening Console</p>
-        </div>
+        <div className="brand-mark">selects.</div>
+        <div className="brand-sub">screening console · v1.4</div>
       </div>
-      <nav className="nav-list">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) => clsx("nav-item", isActive && "nav-item-active")}
-          >
-            {item.label}
-          </NavLink>
+
+      <div className="nav-section-label">Pipeline</div>
+      <nav className="nav">
+        {pipelineNav.map((item) => (
+          <NavItem key={item.to} {...item} />
         ))}
       </nav>
-      <div className="sidebar-bottom">
-        <p className="sidebar-kpi-label">Flow Scope</p>
-        <p className="sidebar-kpi-value">Vacancy → Processing → Shortlist → Feedback</p>
+
+      <div className="nav-section-label">Model</div>
+      <nav className="nav">
+        {modelNav.map((item) => (
+          <NavItem key={item.to} {...item} />
+        ))}
+      </nav>
+
+      <div className="flow-scope">
+        <div className="flow-scope-label">Flow scope</div>
+        <div className="flow-scope-body">
+          vacancy → processing<br />
+          → shortlist → feedback
+        </div>
       </div>
     </aside>
   );

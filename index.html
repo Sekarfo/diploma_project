@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>talentrank — screening console</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app">
+
+  <!-- ============================= SIDEBAR ============================= -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">talentrank</div>
+      <div class="brand-sub">screening console · v1.4</div>
+    </div>
+
+    <div class="nav-section-label">Pipeline</div>
+    <nav class="nav" id="nav">
+      <button class="nav-item is-active" data-screen="dashboard">
+        <span class="nav-glyph">[x]</span><span>Dashboard</span><span class="nav-count"></span>
+      </button>
+      <button class="nav-item" data-screen="vacancies">
+        <span class="nav-glyph">[+]</span><span>Vacancies</span><span class="nav-count">4</span>
+      </button>
+      <button class="nav-item" data-screen="candidates">
+        <span class="nav-glyph">[+]</span><span>Candidates</span><span class="nav-count">8</span>
+      </button>
+      <button class="nav-item" data-screen="shortlists">
+        <span class="nav-glyph">[+]</span><span>Shortlists</span><span class="nav-count">3</span>
+      </button>
+    </nav>
+
+    <div class="nav-section-label">Model</div>
+    <nav class="nav">
+      <button class="nav-item" data-screen="analytics">
+        <span class="nav-glyph">[+]</span><span>Analytics</span><span class="nav-count"></span>
+      </button>
+      <button class="nav-item" data-screen="feedback">
+        <span class="nav-glyph">[+]</span><span>Feedback &amp; Training</span><span class="nav-count">2</span>
+      </button>
+      <button class="nav-item" data-screen="integrations">
+        <span class="nav-glyph">[+]</span><span>Integrations</span><span class="nav-count"></span>
+      </button>
+      <button class="nav-item" data-screen="settings">
+        <span class="nav-glyph">[+]</span><span>Settings</span><span class="nav-count"></span>
+      </button>
+    </nav>
+
+    <div class="flow-scope">
+      <div class="flow-scope-label">Flow scope</div>
+      <div class="flow-scope-body">
+        vacancy &rarr; processing<br/>
+        &rarr; shortlist &rarr; feedback
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============================= MAIN ============================= -->
+  <main class="main">
+
+    <!-- ----- Status bar ----- -->
+    <div class="statusbar">
+      <div class="status-cell">
+        <span class="status-dot"></span>
+        <span class="status-value">queue: healthy</span>
+      </div>
+      <div class="status-cell">
+        <span class="status-label">model:</span>
+        <span class="status-value">ranker-v1.4</span>
+      </div>
+      <div class="status-cell">
+        <span class="status-label">queue:</span>
+        <span class="status-value">24 resumes</span>
+      </div>
+      <div class="status-cell">
+        <span class="status-label">alerts:</span>
+        <span class="status-value">0</span>
+      </div>
+      <div class="status-spacer"></div>
+      <div class="theme-toggle row" role="group" aria-label="Theme">
+        <button class="toggle-opt is-active" data-theme-set="light">[ light ]</button>
+        <button class="toggle-opt" data-theme-set="dark">[ dark ]</button>
+      </div>
+      <button class="icon-btn"><span>a.kenz</span> <span class="status-label">@admin</span></button>
+    </div>
+
+    <!-- ========================== DASHBOARD ========================== -->
+    <section class="screen is-active" data-screen-pane="dashboard" data-screen-label="01 Dashboard">
+      <header class="screen-header">
+        <div>
+          <h1 class="screen-title">dashboard</h1>
+          <p class="screen-sub">man talentrank(1) &mdash; overview of the active screening pipeline</p>
+        </div>
+        <div class="row">
+          <button class="btn btn-ghost"><span class="kbd">R</span> refresh</button>
+          <button class="btn btn-primary">+ create vacancy</button>
+        </div>
+      </header>
+      <hr class="screen-divider"/>
+
+      <div class="manpage">
+        <span class="mp-cmd">NAME</span>
+        <span class="mp-sep">&mdash;</span>
+        <span>talentrank</span>
+        <span class="mp-sep">&middot;</span>
+        <span class="mp-desc">rank candidates against vacancy specifications using LSP-style resume parsing</span>
+        <span class="mp-right">last sync 14:27 &middot; +2m</span>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-label">Total vacancies</div>
+          <div class="stat-value">4</div>
+          <div class="stat-foot">active pipeline inputs</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Resumes processed</div>
+          <div class="stat-value">24</div>
+          <div class="stat-foot">parsed and scored in queue</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Avg matching score</div>
+          <div class="stat-value">64.8%</div>
+          <div class="stat-foot">top-ranked candidate fit</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Time-to-shortlist</div>
+          <div class="stat-value">5.7h</div>
+          <div class="stat-foot">average queue completion</div>
+        </div>
+      </div>
+
+      <div style="height:24px"></div>
+
+      <div class="two-col">
+
+        <!-- Pipeline status -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">pipeline status</h2>
+            <a class="link-cli" href="#vacancies">view all</a>
+          </div>
+          <div class="panel-body flush">
+            <div class="pipeline-row">
+              <div class="pipeline-name">Machine Learning Engineer</div>
+              <span class="badge badge-success">ready</span>
+              <div class="pipeline-bar-wrap">
+                <div class="ascii-bar"><span class="filled">████████████████████████████████████████</span></div>
+                <span>100%</span>
+              </div>
+            </div>
+            <div class="pipeline-row">
+              <div class="pipeline-name">Data Scientist</div>
+              <span class="badge badge-success">ready</span>
+              <div class="pipeline-bar-wrap">
+                <div class="ascii-bar"><span class="filled">████████████████████████████████████████</span></div>
+                <span>100%</span>
+              </div>
+            </div>
+            <div class="pipeline-row">
+              <div class="pipeline-name">ML Platform Engineer</div>
+              <span class="badge badge-success">ready</span>
+              <div class="pipeline-bar-wrap">
+                <div class="ascii-bar"><span class="filled">████████████████████████████████████████</span></div>
+                <span>100%</span>
+              </div>
+            </div>
+            <div class="pipeline-row">
+              <div class="pipeline-name">NLP Engineer</div>
+              <span class="badge badge-info">new</span>
+              <div class="pipeline-bar-wrap">
+                <div class="ascii-bar"><span class="empty">────────────────────────────────────────</span></div>
+                <span>0%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI insights -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">model insights</h2>
+            <span class="mono-mute">ranker-v1.4</span>
+          </div>
+          <div class="panel-body">
+            <div class="kv-row">
+              <span class="kv-key">Model accuracy</span>
+              <span class="kv-val is-success">92.4%</span>
+            </div>
+            <div class="kv-row">
+              <span class="kv-key">Fairness alerts</span>
+              <span class="kv-val is-warning">2 open</span>
+            </div>
+            <div class="kv-row">
+              <span class="kv-key">System load</span>
+              <span class="kv-val">63%</span>
+            </div>
+            <div class="kv-row">
+              <span class="kv-key">Drift (7d)</span>
+              <span class="kv-val">0.08</span>
+            </div>
+            <p style="margin-top:16px;font-size:13px;color:var(--mute)">
+              Live monitoring focuses on ranking confidence, fairness checks,
+              and queue pressure. <a href="#feedback" class="link-cli">open monitor</a>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:32px"></div>
+
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">recent vacancies</h2>
+            <a class="link-cli" href="#vacancies">view all</a>
+          </div>
+          <table class="tbl">
+            <thead><tr>
+              <th>Title</th><th>Status</th><th class="num">Candidates</th><th>Created</th>
+            </tr></thead>
+            <tbody>
+              <tr><td>NLP Engineer</td><td><span class="badge badge-info">new</span></td><td class="num">0</td><td class="muted">12 May, 14:27</td></tr>
+              <tr><td>ML Platform Engineer</td><td><span class="badge badge-success">ready</span></td><td class="num">8</td><td class="muted">12 May, 13:09</td></tr>
+              <tr><td>Data Scientist</td><td><span class="badge badge-success">ready</span></td><td class="num">8</td><td class="muted">11 May, 21:09</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">recent shortlists</h2>
+            <a class="link-cli" href="#shortlists">open</a>
+          </div>
+          <div class="panel-body flush">
+            <div class="pipeline-row" style="grid-template-columns: 1fr auto auto; gap:12px">
+              <div>
+                <div class="pipeline-name">Laura Kim</div>
+                <div class="mono-mute">ML Platform Engineer</div>
+              </div>
+              <div class="score num">98.2%</div>
+              <button class="btn btn-ghost btn-sm">[approve]</button>
+            </div>
+            <div class="pipeline-row" style="grid-template-columns: 1fr auto auto; gap:12px">
+              <div>
+                <div class="pipeline-name">Eldar Sarsembay</div>
+                <div class="mono-mute">ML Platform Engineer</div>
+              </div>
+              <div class="score num">87.6%</div>
+              <button class="btn btn-ghost btn-sm">[approve]</button>
+            </div>
+            <div class="pipeline-row" style="grid-template-columns: 1fr auto auto; gap:12px">
+              <div>
+                <div class="pipeline-name">Amina Kenzhebek</div>
+                <div class="mono-mute">Machine Learning Engineer</div>
+              </div>
+              <div class="score num">86.1%</div>
+              <button class="btn btn-ghost btn-sm">[approve]</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================== VACANCIES ========================== -->
+    <section class="screen" data-screen-pane="vacancies" data-screen-label="02 Vacancies">
+      <header class="screen-header">
+        <div>
+          <h1 class="screen-title">vacancies</h1>
+          <p class="screen-sub">vacancy specs the ranker is currently scoring against</p>
+        </div>
+        <div class="row">
+          <button class="btn btn-ghost">⌕ filter</button>
+          <button class="btn btn-primary">+ create vacancy</button>
+        </div>
+      </header>
+      <hr class="screen-divider"/>
+
+      <div class="tabs">
+        <button class="tab is-active">all <span class="mono-mute">4</span></button>
+        <button class="tab">ready <span class="mono-mute">3</span></button>
+        <button class="tab">new <span class="mono-mute">1</span></button>
+        <button class="tab">archived <span class="mono-mute">0</span></button>
+      </div>
+
+      <div class="panel">
+        <table class="tbl">
+          <thead><tr>
+            <th>Vacancy title</th>
+            <th>Status</th>
+            <th class="num">Candidates</th>
+            <th class="num">Avg score</th>
+            <th>Created</th>
+            <th></th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td>NLP Engineer</td>
+              <td><span class="badge badge-info">new</span></td>
+              <td class="num">0</td>
+              <td class="muted">&mdash;</td>
+              <td class="muted">12 May, 14:27</td>
+              <td><a class="link-cli" href="#">open</a></td>
+            </tr>
+            <tr>
+              <td>ML Platform Engineer</td>
+              <td><span class="badge badge-success">ready</span></td>
+              <td class="num">8</td>
+              <td class="num">87.9%</td>
+              <td class="muted">12 May, 13:09</td>
+              <td><a class="link-cli" href="#">open</a></td>
+            </tr>
+            <tr>
+              <td>Data Scientist</td>
+              <td><span class="badge badge-success">ready</span></td>
+              <td class="num">8</td>
+              <td class="num">71.2%</td>
+              <td class="muted">11 May, 21:09</td>
+              <td><a class="link-cli" href="#">open</a></td>
+            </tr>
+            <tr>
+              <td>Machine Learning Engineer</td>
+              <td><span class="badge badge-success">ready</span></td>
+              <td class="num">8</td>
+              <td class="num">76.4%</td>
+              <td class="muted">10 May, 23:09</td>
+              <td><a class="link-cli" href="#">open</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="height:24px"></div>
+      <p class="mono-mute"># 4 records &middot; sorted by created desc &middot; press <span class="kbd">N</span> to create &middot; <span class="kbd">/</span> to search</p>
+    </section>
+
+    <!-- ========================== CANDIDATES ========================== -->
+    <section class="screen" data-screen-pane="candidates" data-screen-label="03 Candidates">
+      <header class="screen-header">
+        <div>
+          <h1 class="screen-title">candidates</h1>
+          <p class="screen-sub">all resumes parsed across active vacancies</p>
+        </div>
+        <div class="row">
+          <button class="btn btn-ghost">⌕ search</button>
+          <button class="btn btn-ghost">⇡ import resumes</button>
+        </div>
+      </header>
+      <hr class="screen-divider"/>
+
+      <div class="tabs">
+        <button class="tab is-active">all <span class="mono-mute">8</span></button>
+        <button class="tab">shortlisted <span class="mono-mute">3</span></button>
+        <button class="tab">approved <span class="mono-mute">1</span></button>
+        <button class="tab">rejected <span class="mono-mute">1</span></button>
+      </div>
+
+      <div class="card-grid">
+        <div class="cand-card">
+          <div class="cand-name">Amina Kenzhebek</div>
+          <div class="cand-meta">Senior ML Engineer &middot; 7y &middot; Almaty, KZ</div>
+          <div class="cand-skills">
+            <span class="cand-skill">python</span>
+            <span class="cand-skill">xgboost</span>
+            <span class="cand-skill">machine learning</span>
+            <span class="cand-skill">aws</span>
+            <span class="cand-skill">nlp</span>
+          </div>
+          <div class="cand-actions"><a class="link-cli" href="#">view profile</a></div>
+        </div>
+        <div class="cand-card">
+          <div class="cand-name">Daniyar Issatay</div>
+          <div class="cand-meta">Data Scientist &middot; 5y &middot; Astana, KZ</div>
+          <div class="cand-skills">
+            <span class="cand-skill">python</span>
+            <span class="cand-skill">sql</span>
+            <span class="cand-skill">statistics</span>
+            <span class="cand-skill">machine learning</span>
+          </div>
+          <div class="cand-actions"><a class="link-cli" href="#">view profile</a></div>
+        </div>
+        <div class="cand-card">
+          <div class="cand-name">Laura Kim</div>
+          <div class="cand-meta">ML Platform Engineer &middot; 6y &middot; Seattle, US</div>
+          <div class="cand-skills">
+            <span class="cand-skill">python</span>
+            <span class="cand-skill">fastapi</span>
+            <span class="cand-skill">docker</span>
+            <span class="cand-skill">aws</span>
+            <span class="cand-skill">typescript</span>
+          </div>
+          <div class="cand-actions"><a class="link-cli" href="#">view profile</a></div>
+        </div>
+        <div class="cand-card">
+          <div class="cand-name">Timur Nurpeissov</div>
+          <div class="cand-meta">NLP Engineer &middot; 4y &middot; Berlin, DE</div>
+          <div class="cand-skills">
+            <span class="cand-skill">python</span>
+            <span class="cand-skill">nlp</span>
+            <span class="cand-skill">machine learning</span>
+            <span class="cand-skill">sql</span>
+          </div>
+          <div class="cand-actions"><a class="link-cli" href="#">view profile</a></div>
+        </div>
+        <div class="cand-card">
+          <div class="cand-name">Maya Patel</div>
+          <div class="cand-meta">Frontend Engineer (React) &middot; 5y &middot; Boston, US</div>
+          <div class="cand-skills">
+            <span class="cand-skill">react</span>
+            <span class="cand-skill">typescript</span>
+            <span class="cand-skill">python</span>
+            <span class="cand-skill">analytics</span>
+          </div>
+          <div class="cand-actions"><a class="link-cli" href="#">view profile</a></div>
+        </div>
+        <div class="cand-card">
+          <div class="cand-name">Eldar Sarsembay</div>
+          <div class="cand-meta">Data Engineer &middot; 8y &middot; Almaty, KZ</div>
+          <div class="cand-skills">
+            <span class="cand-skill">python</span>
+            <span class="cand-skill">sql</span>
+            <span class="cand-skill">docker</span>
+            <span class="cand-skill">aws</span>
+            <span class="cand-skill">fastapi</span>
+          </div>
+          <div class="cand-actions"><a class="link-cli" href="#">view profile</a></div>
+        </div>
+        <div class="cand-card">
+          <div class="cand-name">Sofia Alvarez</div>
+          <div class="cand-meta">Applied Scientist &middot; 3y &middot; Madrid, ES</div>
+          <div class="cand-skills">
+            <span class="cand-skill">python</span>
+            <span class="cand-skill">machine learning</span>
+            <span class="cand-skill">statistics</span>
+            <span class="cand-skill">nlp</span>
+          </div>
+          <div class="cand-actions"><a class="link-cli" href="#">view profile</a></div>
+        </div>
+        <div class="cand-card">
+          <div class="cand-name">Ivan Chen</div>
+          <div class="cand-meta">Backend Engineer &middot; 6y &middot; Toronto, CA</div>
+          <div class="cand-skills">
+            <span class="cand-skill">fastapi</span>
+            <span class="cand-skill">python</span>
+            <span class="cand-skill">docker</span>
+            <span class="cand-skill">sql</span>
+          </div>
+          <div class="cand-actions"><a class="link-cli" href="#">view profile</a></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================== SHORTLISTS ========================== -->
+    <section class="screen" data-screen-pane="shortlists" data-screen-label="04 Shortlists">
+      <header class="screen-header">
+        <div>
+          <h1 class="screen-title">shortlists</h1>
+          <p class="screen-sub">ranker output &mdash; top fits per vacancy with SHAP explanation</p>
+        </div>
+        <div class="row">
+          <label class="field-inline mono-mute">vacancy:&nbsp;
+            <select class="field" style="width:220px">
+              <option>ML Platform Engineer</option>
+              <option>Data Scientist</option>
+              <option>Machine Learning Engineer</option>
+              <option>NLP Engineer</option>
+            </select>
+          </label>
+          <div class="slider-row">
+            <span class="mono-mute">min score</span>
+            <input type="range" class="slider" min="0" max="100" value="65" />
+            <span class="num" style="min-width:36px">65%</span>
+          </div>
+        </div>
+      </header>
+      <hr class="screen-divider"/>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">ranking · ML Platform Engineer</h2>
+          <span class="mono-mute">3 candidates above threshold</span>
+        </div>
+        <table class="tbl">
+          <thead><tr>
+            <th>Candidate</th>
+            <th class="num">Match</th>
+            <th class="num">Skills</th>
+            <th>Experience</th>
+            <th>Explanation</th>
+            <th>Action</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td>Laura Kim</td>
+              <td>
+                <div class="score">
+                  <span class="score-bar"><span class="on">██████████</span></span>
+                  <span class="num">98.2%</span>
+                </div>
+              </td>
+              <td class="num">100.0%</td>
+              <td>6y</td>
+              <td class="muted">Primary fit driven by python, docker and experience alignment.</td>
+              <td>
+                <div class="row">
+                  <button class="btn btn-ghost btn-sm">[approve]</button>
+                  <button class="btn btn-danger btn-sm">[reject]</button>
+                  <a class="link-cli" href="#">view</a>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td>Eldar Sarsembay</td>
+              <td>
+                <div class="score">
+                  <span class="score-bar"><span class="on">█████████</span><span class="off">─</span></span>
+                  <span class="num">87.6%</span>
+                </div>
+              </td>
+              <td class="num">100.0%</td>
+              <td>8y</td>
+              <td class="muted">Strong skill overlap; senior experience compensates platform gaps.</td>
+              <td>
+                <div class="row">
+                  <button class="btn btn-ghost btn-sm">[approve]</button>
+                  <button class="btn btn-danger btn-sm">[reject]</button>
+                  <a class="link-cli" href="#">view</a>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td>Ivan Chen</td>
+              <td>
+                <div class="score">
+                  <span class="score-bar"><span class="on">████████</span><span class="off">──</span></span>
+                  <span class="num">78.2%</span>
+                </div>
+              </td>
+              <td class="num">75.0%</td>
+              <td>6y</td>
+              <td class="muted">Partial skill match; missing aws but strong backend &amp; docker.</td>
+              <td>
+                <div class="row">
+                  <button class="btn btn-ghost btn-sm">[approve]</button>
+                  <button class="btn btn-danger btn-sm">[reject]</button>
+                  <a class="link-cli" href="#">view</a>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="height:32px"></div>
+
+      <h2 class="panel-title" style="margin-bottom:16px">shap-based factors</h2>
+
+      <div class="card-grid" style="grid-template-columns: repeat(3, 1fr)">
+        <div class="shap" style="border-right:0;border-bottom:0">
+          <div class="row-between">
+            <div class="shap-name">Laura Kim</div>
+            <span class="badge badge-success">98.2%</span>
+          </div>
+          <div class="mono-mute">ML Platform Engineer · 6y exp</div>
+          <hr/>
+          <div class="shap-row"><span>skill overlap</span><span class="num">100%</span></div>
+          <div class="shap-bar"><span style="color:var(--ink)">██████████</span></div>
+          <div class="shap-row"><span>experience alignment</span><span class="num">90%</span></div>
+          <div class="shap-bar"><span style="color:var(--ink)">█████████</span><span style="color:var(--ash)">─</span></div>
+          <div class="shap-row"><span>title similarity</span><span class="num">95%</span></div>
+          <div class="shap-bar"><span style="color:var(--ink)">█████████▌</span></div>
+        </div>
+        <div class="shap" style="border-right:0;border-bottom:0">
+          <div class="row-between">
+            <div class="shap-name">Eldar Sarsembay</div>
+            <span class="badge badge-success">87.6%</span>
+          </div>
+          <div class="mono-mute">Data Engineer · 8y exp</div>
+          <hr/>
+          <div class="shap-row"><span>skill overlap</span><span class="num">100%</span></div>
+          <div class="shap-bar"><span style="color:var(--ink)">██████████</span></div>
+          <div class="shap-row"><span>experience alignment</span><span class="num">60%</span></div>
+          <div class="shap-bar"><span style="color:var(--ink)">██████</span><span style="color:var(--ash)">────</span></div>
+          <div class="shap-row"><span>title similarity</span><span class="num">72%</span></div>
+          <div class="shap-bar"><span style="color:var(--ink)">███████</span><span style="color:var(--ash)">───</span></div>
+        </div>
+        <div class="shap" style="border-bottom:0">
+          <div class="row-between">
+            <div class="shap-name">Ivan Chen</div>
+            <span class="badge">78.2%</span>
+          </div>
+          <div class="mono-mute">Backend Engineer · 6y exp</div>
+          <hr/>
+          <div class="shap-row"><span>skill overlap</span><span class="num">80%</span></div>
+          <div class="shap-bar"><span style="color:var(--ink)">████████</span><span style="color:var(--ash)">──</span></div>
+          <div class="shap-row"><span>experience alignment</span><span class="num">90%</span></div>
+          <div class="shap-bar"><span style="color:var(--ink)">█████████</span><span style="color:var(--ash)">─</span></div>
+          <div class="shap-row"><span>title similarity</span><span class="num">65%</span></div>
+          <div class="shap-bar"><span style="color:var(--ink)">██████</span><span style="color:var(--ash)">────</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================== ANALYTICS ========================== -->
+    <section class="screen" data-screen-pane="analytics" data-screen-label="05 Analytics">
+      <header class="screen-header">
+        <div>
+          <h1 class="screen-title">analytics</h1>
+          <p class="screen-sub">ranking confidence, throughput, fairness over time</p>
+        </div>
+        <div class="row">
+          <button class="btn btn-ghost">7d</button>
+          <button class="btn btn-secondary">30d</button>
+          <button class="btn btn-ghost">90d</button>
+        </div>
+      </header>
+      <hr class="screen-divider"/>
+
+      <div class="stat-row">
+        <div class="stat"><div class="stat-label">Throughput</div><div class="stat-value">24/d</div><div class="stat-foot">resumes processed</div></div>
+        <div class="stat"><div class="stat-label">Approval rate</div><div class="stat-value">38%</div><div class="stat-foot">shortlist → approve</div></div>
+        <div class="stat"><div class="stat-label">Fairness Δ</div><div class="stat-value">0.04</div><div class="stat-foot">demographic parity</div></div>
+        <div class="stat"><div class="stat-label">P95 latency</div><div class="stat-value">412ms</div><div class="stat-foot">per ranking call</div></div>
+      </div>
+
+      <div style="height:24px"></div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">score distribution · 30d</h2>
+          <span class="mono-mute">bucket size = 5pp</span>
+        </div>
+        <div class="panel-body">
+          <pre style="margin:0;font-family:var(--font-mono);font-size:13px;line-height:1.55;color:var(--ink)"> 95-100 ████                                            12
+ 90- 95 ██████████                                      28
+ 85- 90 ██████████████████                              47
+ 80- 85 ██████████████████████████                      66
+ 75- 80 ████████████████████████████████████            91
+ 70- 75 ██████████████████████████████████████████     104
+ 65- 70 ████████████████████████████████████████████   112  ← threshold
+ 60- 65 ███████████████████████████                     71
+ 55- 60 ██████████████████                              48
+ 50- 55 ██████████                                      27</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================== FEEDBACK ========================== -->
+    <section class="screen" data-screen-pane="feedback" data-screen-label="06 Feedback">
+      <header class="screen-header">
+        <div>
+          <h1 class="screen-title">feedback &amp; training</h1>
+          <p class="screen-sub">reviewer decisions feed back into the next ranker version</p>
+        </div>
+        <div class="row">
+          <button class="btn btn-ghost">export labels</button>
+          <button class="btn btn-primary">⇡ trigger retraining</button>
+        </div>
+      </header>
+      <hr class="screen-divider"/>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">labelled decisions</h2>
+          <span class="mono-mute">2 pending · last ingest 12 May 14:51</span>
+        </div>
+        <table class="tbl">
+          <thead><tr>
+            <th>Candidate</th>
+            <th>Decision</th>
+            <th>Reason</th>
+            <th>Vacancy</th>
+            <th>Model</th>
+            <th>Actions</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td>
+                <div class="pipeline-name">Timur Nurpeissov</div>
+                <div class="muted">12 May, 14:51</div>
+              </td>
+              <td>
+                <select class="field" style="width:120px">
+                  <option>reject</option><option>approve</option><option>hold</option>
+                </select>
+              </td>
+              <td><input class="field" value="Skill overlap was high but product fit was off" /></td>
+              <td>Data Scientist</td>
+              <td><code>ranker-v1.4</code></td>
+              <td>
+                <div class="row">
+                  <button class="btn btn-ghost btn-sm">[edit labels]</button>
+                  <button class="btn btn-secondary btn-sm">[send to retrain]</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <div class="pipeline-name">Amina Kenzhebek</div>
+                <div class="muted">12 May, 14:29</div>
+              </td>
+              <td>
+                <select class="field" style="width:120px">
+                  <option>approve</option><option>reject</option><option>hold</option>
+                </select>
+              </td>
+              <td><input class="field" value="Excellent feature ownership across NLP stack" /></td>
+              <td>Machine Learning Engineer</td>
+              <td><code>ranker-v1.4</code></td>
+              <td>
+                <div class="row">
+                  <button class="btn btn-ghost btn-sm">[edit labels]</button>
+                  <span class="badge badge-warning">queued</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="height:24px"></div>
+
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-header"><h2 class="panel-title">retraining pipeline</h2><span class="mono-mute">next run · 16 May 00:00 UTC</span></div>
+          <div class="panel-body">
+            <pre style="margin:0;font-size:13px;line-height:1.7;color:var(--ink)">[x] ingest labelled decisions      2 / 2
+[x] validate against holdout       1,204 rows
+[x] retrain ranker                 ETA 14m
+[ ] shadow eval vs v1.4            pending
+[ ] promote → v1.5                 pending</pre>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><h2 class="panel-title">label health</h2></div>
+          <div class="panel-body">
+            <div class="kv-row"><span class="kv-key">Labelled this week</span><span class="kv-val">17</span></div>
+            <div class="kv-row"><span class="kv-key">Inter-rater agreement</span><span class="kv-val is-success">0.81</span></div>
+            <div class="kv-row"><span class="kv-key">Pending review</span><span class="kv-val is-warning">2</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================== INTEGRATIONS ========================== -->
+    <section class="screen" data-screen-pane="integrations" data-screen-label="07 Integrations">
+      <header class="screen-header">
+        <div>
+          <h1 class="screen-title">integrations</h1>
+          <p class="screen-sub">where vacancy specs come in, where shortlists go out</p>
+        </div>
+        <button class="btn btn-primary">+ connect source</button>
+      </header>
+      <hr class="screen-divider"/>
+
+      <div class="panel">
+        <table class="tbl">
+          <thead><tr><th>Source</th><th>Direction</th><th>Status</th><th>Last sync</th><th></th></tr></thead>
+          <tbody>
+            <tr><td>Greenhouse ATS</td><td class="muted">vacancies → in, shortlist → out</td><td><span class="badge badge-success">connected</span></td><td class="muted">12 May, 14:25</td><td><a class="link-cli" href="#">configure</a></td></tr>
+            <tr><td>Workday</td><td class="muted">vacancies → in</td><td><span class="badge badge-success">connected</span></td><td class="muted">12 May, 14:25</td><td><a class="link-cli" href="#">configure</a></td></tr>
+            <tr><td>LinkedIn Recruiter</td><td class="muted">resumes → in</td><td><span class="badge badge-warning">token expired</span></td><td class="muted">10 May, 11:02</td><td><a class="link-cli" href="#">reconnect</a></td></tr>
+            <tr><td>Webhook · talentrank.io/api</td><td class="muted">shortlist → out</td><td><span class="badge badge-info">idle</span></td><td class="muted">never</td><td><a class="link-cli" href="#">configure</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ========================== SETTINGS ========================== -->
+    <section class="screen" data-screen-pane="settings" data-screen-label="08 Settings">
+      <header class="screen-header">
+        <div>
+          <h1 class="screen-title">settings</h1>
+          <p class="screen-sub">scopes, privacy posture, model thresholds</p>
+        </div>
+        <button class="btn btn-primary">save settings</button>
+      </header>
+      <hr class="screen-divider"/>
+
+      <div class="panel">
+        <div class="panel-header"><h2 class="panel-title">user roles</h2><span class="mono-mute">3 roles defined</span></div>
+        <table class="tbl">
+          <thead><tr><th>Role</th><th>Scope</th><th class="num">Members</th></tr></thead>
+          <tbody>
+            <tr><td>Recruiter</td><td class="muted">Review shortlist, approve/reject, submit feedback.</td><td class="num">12</td></tr>
+            <tr><td>ML Engineer</td><td class="muted">Inspect explanations, monitor metrics, trigger retraining pipeline.</td><td class="num">4</td></tr>
+            <tr><td>Admin</td><td class="muted">Manage integrations, threshold settings, and model versions.</td><td class="num">2</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="height:24px"></div>
+
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-header"><h2 class="panel-title">data privacy</h2></div>
+          <div class="panel-body stack-16">
+            <label class="check is-on" onclick="this.classList.toggle('is-on')">
+              <span class="box">[x]</span>
+              <span>Enable PII masking on resume previews</span>
+            </label>
+            <label class="check is-on" onclick="this.classList.toggle('is-on')">
+              <span class="box">[x]</span>
+              <span>Enable audit logging for reviewer actions</span>
+            </label>
+            <label class="check" onclick="this.classList.toggle('is-on')">
+              <span class="box">[ ]</span>
+              <span>Strip location data from candidate cards</span>
+            </label>
+            <label class="check" onclick="this.classList.toggle('is-on')">
+              <span class="box">[ ]</span>
+              <span>Auto-purge resumes after 90 days</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header"><h2 class="panel-title">model + thresholds</h2></div>
+          <div class="panel-body stack-16">
+            <label style="display:flex;flex-direction:column;gap:6px">
+              <span class="mono-mute">model version selection</span>
+              <select class="field">
+                <option>ranker-v1.4 (production)</option>
+                <option>ranker-v1.3</option>
+                <option>ranker-v1.5-rc1 (shadow)</option>
+              </select>
+            </label>
+            <div>
+              <div class="row-between" style="margin-bottom:8px">
+                <span class="mono-mute">threshold &middot; min score</span>
+                <span class="num" style="font-weight:500">65%</span>
+              </div>
+              <input type="range" class="slider" min="0" max="100" value="65" style="width:100%"/>
+            </div>
+            <div>
+              <div class="row-between" style="margin-bottom:8px">
+                <span class="mono-mute">fairness alert sensitivity</span>
+                <span class="num" style="font-weight:500">medium</span>
+              </div>
+              <input type="range" class="slider" min="0" max="100" value="50" style="width:100%"/>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // ---------- Nav switching ----------
+  const navItems = document.querySelectorAll('.nav-item');
+  const screens = document.querySelectorAll('.screen');
+  navItems.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.screen;
+      navItems.forEach(b => {
+        b.classList.toggle('is-active', b === btn);
+        const glyph = b.querySelector('.nav-glyph');
+        glyph.textContent = b === btn ? '[x]' : '[+]';
+      });
+      screens.forEach(s => s.classList.toggle('is-active', s.dataset.screenPane === target));
+      window.scrollTo(0, 0);
+    });
+  });
+
+  // ---------- Theme toggle ----------
+  const themeBtns = document.querySelectorAll('[data-theme-set]');
+  themeBtns.forEach(b => b.addEventListener('click', () => {
+    const t = b.dataset.themeSet;
+    document.documentElement.setAttribute('data-theme', t);
+    themeBtns.forEach(x => x.classList.toggle('is-active', x === b));
+    try { localStorage.setItem('tr-theme', t); } catch(e){}
+  }));
+  // restore saved theme
+  try {
+    const saved = localStorage.getItem('tr-theme');
+    if (saved) {
+      document.documentElement.setAttribute('data-theme', saved);
+      themeBtns.forEach(x => x.classList.toggle('is-active', x.dataset.themeSet === saved));
+    }
+  } catch(e){}
+</script>
+</body>
+</html>

@@ -19,9 +19,7 @@ export function SettingsPage(): JSX.Element {
   const [auditLoggingEnabled, setAuditLoggingEnabled] = useState(true);
 
   useEffect(() => {
-    if (!query.data) {
-      return;
-    }
+    if (!query.data) return;
     updateModelVersion(query.data.modelVersion);
     updateMinScoreThreshold(query.data.minScoreThreshold);
     setPiiMaskingEnabled(query.data.piiMaskingEnabled);
@@ -30,12 +28,7 @@ export function SettingsPage(): JSX.Element {
 
   const mutation = useMutation({
     mutationFn: () =>
-      api.settings.update({
-        modelVersion,
-        minScoreThreshold,
-        piiMaskingEnabled,
-        auditLoggingEnabled
-      }),
+      api.settings.update({ modelVersion, minScoreThreshold, piiMaskingEnabled, auditLoggingEnabled }),
     onSuccess: (settings) => {
       setMinScoreThreshold(settings.minScoreThreshold);
       setModelVersion(settings.modelVersion);
@@ -45,88 +38,99 @@ export function SettingsPage(): JSX.Element {
   });
 
   return (
-    <section className="page-stack">
-      <div className="panel-head">
-        <h1>Settings</h1>
-      </div>
+    <section className="screen is-active">
+      <header className="screen-header">
+        <div>
+          <h1 className="screen-title">settings</h1>
+          <p className="screen-sub">scopes, privacy posture, model thresholds</p>
+        </div>
+        <button type="button" className="btn btn-primary" onClick={() => mutation.mutate()}>
+          {mutation.isPending ? "saving..." : "save settings"}
+        </button>
+      </header>
+      <hr className="screen-divider" />
 
-      <section className="panel">
-        <h3>User roles</h3>
-        <table className="data-table">
+      <div className="panel">
+        <div className="panel-header">
+          <h2 className="panel-title">user roles</h2>
+          <span className="mono-mute">3 roles defined</span>
+        </div>
+        <table className="tbl">
           <thead>
             <tr>
               <th>Role</th>
               <th>Scope</th>
+              <th className="num">Members</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>Recruiter</td>
-              <td>Review shortlist, approve/reject, submit feedback.</td>
-            </tr>
-            <tr>
-              <td>ML Engineer</td>
-              <td>Inspect explanations, monitor metrics, trigger retraining pipeline.</td>
-            </tr>
-            <tr>
-              <td>Admin</td>
-              <td>Manage integrations, threshold settings, and model versions.</td>
-            </tr>
+            <tr><td>Recruiter</td><td className="muted">Review shortlist, approve/reject, submit feedback.</td><td className="num">12</td></tr>
+            <tr><td>ML Engineer</td><td className="muted">Inspect explanations, monitor metrics, trigger retraining pipeline.</td><td className="num">4</td></tr>
+            <tr><td>Admin</td><td className="muted">Manage integrations, threshold settings, and model versions.</td><td className="num">2</td></tr>
           </tbody>
         </table>
-      </section>
+      </div>
 
-      <section className="split-grid">
-        <section className="panel">
-          <h3>Data privacy settings</h3>
-          <label className="checkbox-field">
-            <input
-              type="checkbox"
-              checked={piiMaskingEnabled}
-              onChange={(event) => setPiiMaskingEnabled(event.target.checked)}
-            />
-            <span>Enable PII masking on resume previews</span>
-          </label>
-          <label className="checkbox-field">
-            <input
-              type="checkbox"
-              checked={auditLoggingEnabled}
-              onChange={(event) => setAuditLoggingEnabled(event.target.checked)}
-            />
-            <span>Enable audit logging for reviewer actions</span>
-          </label>
-        </section>
+      <div style={{ height: 24 }} />
 
-        <section className="panel">
-          <h3>Model + thresholds</h3>
-          <label className="field">
-            <span>Model version selection</span>
-            <select value={modelVersion} onChange={(event) => updateModelVersion(event.target.value)}>
-              <option value="ranker-v1.4">ranker-v1.4</option>
-              <option value="ranker-v1.3">ranker-v1.3</option>
-              <option value="baseline-v1.0">baseline-v1.0</option>
-            </select>
-          </label>
+      <div className="two-col">
+        <div className="panel">
+          <div className="panel-header">
+            <h2 className="panel-title">data privacy</h2>
+          </div>
+          <div className="panel-body stack-16">
+            <label
+              className={`check${piiMaskingEnabled ? " is-on" : ""}`}
+              onClick={() => setPiiMaskingEnabled((v) => !v)}
+            >
+              <span className="box">{piiMaskingEnabled ? "[x]" : "[ ]"}</span>
+              <span>Enable PII masking on resume previews</span>
+            </label>
+            <label
+              className={`check${auditLoggingEnabled ? " is-on" : ""}`}
+              onClick={() => setAuditLoggingEnabled((v) => !v)}
+            >
+              <span className="box">{auditLoggingEnabled ? "[x]" : "[ ]"}</span>
+              <span>Enable audit logging for reviewer actions</span>
+            </label>
+          </div>
+        </div>
 
-          <label className="field">
-            <span>Threshold (min score): {minScoreThreshold}%</span>
-            <input
-              type="range"
-              min={40}
-              max={95}
-              value={minScoreThreshold}
-              onChange={(event) => updateMinScoreThreshold(Number(event.target.value))}
-            />
-          </label>
-        </section>
-      </section>
-
-      <section className="panel">
-        <button type="button" className="primary-button" onClick={() => mutation.mutate()}>
-          {mutation.isPending ? "Saving..." : "Save settings"}
-        </button>
-      </section>
+        <div className="panel">
+          <div className="panel-header">
+            <h2 className="panel-title">model + thresholds</h2>
+          </div>
+          <div className="panel-body stack-16">
+            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span className="mono-mute">model version selection</span>
+              <select
+                className="field"
+                value={modelVersion}
+                onChange={(e) => updateModelVersion(e.target.value)}
+              >
+                <option value="ranker-v1.4">ranker-v1.4 (production)</option>
+                <option value="ranker-v1.3">ranker-v1.3</option>
+                <option value="baseline-v1.0">baseline-v1.0</option>
+              </select>
+            </label>
+            <div>
+              <div className="row-between" style={{ marginBottom: 8 }}>
+                <span className="mono-mute">threshold · min score</span>
+                <span className="num" style={{ fontWeight: 500 }}>{minScoreThreshold}%</span>
+              </div>
+              <input
+                type="range"
+                className="slider"
+                min={40}
+                max={95}
+                value={minScoreThreshold}
+                style={{ width: "100%" }}
+                onChange={(e) => updateMinScoreThreshold(Number(e.target.value))}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
-

@@ -1,23 +1,33 @@
-import clsx from "clsx";
 import type { VacancyStatus } from "../../types";
 
 interface Props {
-  status: VacancyStatus | "healthy" | "degraded";
+  status: VacancyStatus | "healthy" | "degraded" | "connected" | "token_expired" | "idle";
 }
 
-const statusLabel: Record<Props["status"], string> = {
-  NEW: "NEW",
-  PROCESSING: "PROCESSING",
-  READY: "READY",
-  healthy: "Healthy",
-  degraded: "Degraded"
+const statusClass: Record<string, string> = {
+  NEW: "badge-info",
+  PROCESSING: "badge-warning",
+  READY: "badge-success",
+  healthy: "badge-success",
+  degraded: "badge-warning",
+  connected: "badge-success",
+  token_expired: "badge-warning",
+  idle: "badge-info",
+};
+
+const statusLabel: Record<string, string> = {
+  NEW: "new",
+  PROCESSING: "processing",
+  READY: "ready",
+  healthy: "healthy",
+  degraded: "degraded",
+  connected: "connected",
+  token_expired: "token expired",
+  idle: "idle",
 };
 
 export function StatusIndicator({ status }: Props): JSX.Element {
-  return (
-    <span className={clsx("status-indicator", `status-${status.toLowerCase()}`)}>
-      {statusLabel[status]}
-    </span>
-  );
+  const cls = statusClass[status] ?? "";
+  const label = statusLabel[status] ?? status.toLowerCase();
+  return <span className={`badge ${cls}`}>{label}</span>;
 }
-
