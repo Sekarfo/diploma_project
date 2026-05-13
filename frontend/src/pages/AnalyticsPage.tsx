@@ -2,15 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { formatHours, formatPercent } from "../lib/format";
 
-function AnalyticsMetric(props: { label: string; value: string }): JSX.Element {
-  return (
-    <article className="panel metric-card">
-      <p className="metric-label">{props.label}</p>
-      <h2>{props.value}</h2>
-    </article>
-  );
-}
-
 export function AnalyticsPage(): JSX.Element {
   const query = useQuery({
     queryKey: ["analytics"],
@@ -18,59 +9,88 @@ export function AnalyticsPage(): JSX.Element {
   });
 
   if (!query.data) {
-    return <section className="panel loading-state">Loading analytics...</section>;
+    return (
+      <section className="screen is-active">
+        <p className="mono-mute">Loading analytics...</p>
+      </section>
+    );
   }
 
   const analytics = query.data;
 
   return (
-    <section className="page-stack">
-      <div className="panel-head">
-        <h1>Analytics</h1>
+    <section className="screen is-active">
+      <header className="screen-header">
+        <div>
+          <h1 className="screen-title">analytics</h1>
+          <p className="screen-sub">ranking confidence, throughput, fairness over time</p>
+        </div>
+      </header>
+      <hr className="screen-divider" />
+
+      <div className="stat-row">
+        <div className="stat">
+          <div className="stat-label">Precision@10</div>
+          <div className="stat-value">{formatPercent(analytics.precisionAt10)}</div>
+          <div className="stat-foot">ranking quality</div>
+        </div>
+        <div className="stat">
+          <div className="stat-label">Recall</div>
+          <div className="stat-value">{formatPercent(analytics.recall)}</div>
+          <div className="stat-foot">coverage</div>
+        </div>
+        <div className="stat">
+          <div className="stat-label">Avg shortlist time</div>
+          <div className="stat-value">{formatHours(analytics.avgShortlistHours)}</div>
+          <div className="stat-foot">queue completion</div>
+        </div>
+        <div className="stat">
+          <div className="stat-label">Fairness score</div>
+          <div className="stat-value">{formatPercent(analytics.fairnessScore)}</div>
+          <div className="stat-foot">demographic parity</div>
+        </div>
       </div>
 
-      <div className="metrics-row">
-        <AnalyticsMetric label="Precision@10" value={formatPercent(analytics.precisionAt10)} />
-        <AnalyticsMetric label="Recall" value={formatPercent(analytics.recall)} />
-        <AnalyticsMetric label="Avg shortlist time" value={formatHours(analytics.avgShortlistHours)} />
-        <AnalyticsMetric label="Fairness metrics" value={formatPercent(analytics.fairnessScore)} />
-      </div>
+      <div style={{ height: 24 }} />
 
-      <div className="split-grid">
-        <section className="panel">
-          <h3>Model performance over time</h3>
-          <div className="chart-rows">
-            {analytics.performanceSeries.map((point) => (
-              <div key={point.label} className="chart-row">
-                <span>{point.label}</span>
-                <div className="chart-track">
-                  <div className="chart-bar-primary" style={{ width: `${point.precision}%` }} />
-                  <div className="chart-bar-secondary" style={{ width: `${point.recall}%` }} />
-                </div>
-                <span>
-                  P {point.precision}% · R {point.recall}%
-                </span>
-              </div>
-            ))}
+      <div className="two-col">
+        <div className="panel">
+          <div className="panel-header">
+            <h2 className="panel-title">model performance over time</h2>
           </div>
-        </section>
+          <div className="panel-body">
+            <pre style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.55, color: "var(--ink)" }}>
+              {analytics.performanceSeries.map((point) => {
+                const barLen = Math.round(point.precision / 2.5);
+                return `${point.label.padStart(6)} ${"█".repeat(barLen)}${" ".repeat(40 - barLen)} P${point.precision}% R${point.recall}%\n`;
+              }).join("")}
+            </pre>
+          </div>
+        </div>
 
-        <section className="panel">
-          <h3>Hiring distribution</h3>
-          <div className="bar-chart">
-            {analytics.hiringDistribution.map((bucket) => (
-              <div key={bucket.bucket} className="bar-item">
-                <span>{bucket.bucket}</span>
-                <div className="bar-track">
-                  <div style={{ width: `${Math.max(6, bucket.value * 30)}%` }} />
-                </div>
-                <span>{bucket.value}</span>
-              </div>
-            ))}
+        <div className="panel">
+          <div className="panel-header">
+            <h2 className="panel-title">hiring distribution</h2>
           </div>
-        </section>
+          <div className="panel-body">
+            {analytics.hiringDistribution.map((bucket) => {
+              const filled = Math.min(10, Math.round(bucket.value / 3));
+              return (
+                <div key={bucket.bucket}>
+                  <div className="shap-row">
+                    <span>{bucket.bucket}</span>
+                    <span className="num">{bucket.value}</span>
+                  </div>
+                  <div className="shap-bar">
+                    <span style={{ color: "var(--ink)" }}>{"█".repeat(filled)}</span>
+                    <span style={{ color: "var(--ash)" }}>{"─".repeat(10 - filled)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </section>
   );
 }
-

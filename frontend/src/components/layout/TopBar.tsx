@@ -5,27 +5,32 @@ export function TopBar(): JSX.Element {
   const { data } = useQuery({
     queryKey: ["dashboard", "summary", "topbar"],
     queryFn: api.dashboard.summary,
-    refetchInterval: 3000
+    refetchInterval: 3000,
   });
 
   const processingCount =
     data?.pipeline.filter((item) => item.status === "PROCESSING").length ?? 0;
-  const queueState = processingCount > 0 ? "Processing jobs running" : "Queue healthy";
+  const queueState = processingCount > 0 ? "queue: processing" : "queue: healthy";
 
   return (
-    <header className="topbar">
-      <div className="topbar-status">
-        <span className={`status-dot ${processingCount > 0 ? "status-dot-busy" : "status-dot-ok"}`} />
-        <span>{queueState}</span>
+    <div className="statusbar">
+      <div className="status-cell">
+        <span className="status-dot" />
+        <span className="status-value">{queueState}</span>
       </div>
-      <div className="topbar-user">
-        <button type="button" className="ghost-button">
-          Alerts
-          <span className="topbar-count">{processingCount}</span>
-        </button>
-        <div className="user-pill">A</div>
+      <div className="status-cell">
+        <span className="status-label">model:</span>
+        <span className="status-value">lgbm-ranker</span>
       </div>
-    </header>
+      <div className="status-cell">
+        <span className="status-label">alerts:</span>
+        <span className="status-value">{processingCount}</span>
+      </div>
+      <div className="status-spacer" />
+      <button type="button" className="icon-btn">
+        <span>hr</span>
+        <span className="status-label">@selects.</span>
+      </button>
+    </div>
   );
 }
-

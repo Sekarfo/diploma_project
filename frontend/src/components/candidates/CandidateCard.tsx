@@ -1,31 +1,31 @@
 import { Link } from "react-router-dom";
 import type { ShortlistCandidate } from "../../types";
-import { ScoreBadge } from "../common/ScoreBadge";
 
 interface Props {
   entry: ShortlistCandidate;
 }
 
 export function CandidateCard({ entry }: Props): JSX.Element {
-  const topSkills = entry.topMatchingSkills.length > 0 ? entry.topMatchingSkills : entry.candidate.skills.slice(0, 4);
+  const topSkills =
+    entry.topMatchingSkills.length > 0
+      ? entry.topMatchingSkills
+      : entry.candidate.skills.slice(0, 4);
   return (
-    <article className="panel candidate-card">
-      <div className="candidate-card-top">
-        <div>
-          <h4>{entry.candidate.fullName}</h4>
-          <p className="muted">
-            {entry.candidate.headline} · {entry.candidate.experienceYears}y exp
-          </p>
-        </div>
-        <ScoreBadge score={entry.matchScore} />
+    <div className="cand-card">
+      <div className="cand-name">{entry.candidate.fullName}</div>
+      <div className="cand-meta">
+        {entry.candidate.headline} · {entry.candidate.experienceYears}y exp
       </div>
-      <p className="candidate-skills">{topSkills.join(" · ")}</p>
-      <p className="muted">{entry.explanation}</p>
-      <div className="candidate-card-actions">
-        <Link className="text-link" to={`/candidates/${entry.candidateId}`}>
-          View profile
+      <div className="cand-skills">
+        {topSkills.map((skill) => (
+          <span key={skill} className="cand-skill">{skill}</span>
+        ))}
+      </div>
+      <div className="cand-actions">
+        <Link className="link-cli" to={`/candidates/${entry.candidateId}`}>
+          view profile
         </Link>
       </div>
-    </article>
+    </div>
   );
 }

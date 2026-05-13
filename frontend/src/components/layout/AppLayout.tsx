@@ -4,14 +4,12 @@ import { TopBar } from "./TopBar";
 
 export function AppLayout(): JSX.Element {
   return (
-    <div className="app-shell">
+    <div className="app">
       <Sidebar />
-      <div className="workspace-shell">
+      <main className="main">
         <TopBar />
-        <main className="workspace-content">
-          <Outlet />
-        </main>
-      </div>
+        <Outlet />
+      </main>
     </div>
   );
 }

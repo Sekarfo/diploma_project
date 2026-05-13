@@ -67,7 +67,7 @@ export function VacancyDetailPage(): JSX.Element {
   });
 
   if (!query.data) {
-    return <section className="panel loading-state">Vacancy not found.</section>;
+    return <section className="screen is-active"><p className="mono-mute">Vacancy not found.</p></section>;
   }
 
   function addSkill(event: FormEvent<HTMLFormElement>): void {
@@ -81,74 +81,102 @@ export function VacancyDetailPage(): JSX.Element {
   }
 
   return (
-    <section className="page-stack">
-      <div className="panel-head">
-        <h1>{query.data.title}</h1>
+    <section className="screen is-active">
+      <header className="screen-header">
+        <div>
+          <h1 className="screen-title">{query.data.title}</h1>
+          <p className="screen-sub">vacancy configuration · weights &amp; skills</p>
+        </div>
         <StatusIndicator status={query.data.status} />
-      </div>
+      </header>
+      <hr className="screen-divider" />
 
-      <div className="split-grid">
-        <section className="panel">
-          <h3>Job description</h3>
-          <p className="muted">{query.data.description}</p>
-          <h4>Extracted skills (editable)</h4>
-          <div className="inline-list">
-            {skills.map((skill) => (
-              <button
-                type="button"
-                key={skill}
-                className="tag removable-tag"
-                onClick={() => setSkills((prev) => prev.filter((item) => item !== skill))}
-              >
-                {skill} ×
-              </button>
-            ))}
+      <div className="two-col">
+        <div className="panel">
+          <div className="panel-header">
+            <h2 className="panel-title">job description</h2>
           </div>
-          <form className="inline-form" onSubmit={addSkill}>
-            <input
-              type="text"
-              value={newSkill}
-              onChange={(event) => setNewSkill(event.target.value)}
-              placeholder="Add skill"
-            />
-            <button type="submit" className="secondary-button">
-              Add
-            </button>
-          </form>
-        </section>
+          <div className="panel-body stack-16">
+            <p className="muted">{query.data.description}</p>
+            <div>
+              <span className="mono-mute">extracted skills</span>
+              <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {skills.map((skill) => (
+                  <button
+                    type="button"
+                    key={skill}
+                    className="badge"
+                    style={{ cursor: "pointer", background: "none", border: "1px solid var(--hairline)" }}
+                    onClick={() => setSkills((prev) => prev.filter((item) => item !== skill))}
+                  >
+                    {skill} ×
+                  </button>
+                ))}
+              </div>
+            </div>
+            <form style={{ display: "flex", gap: 8 }} onSubmit={addSkill}>
+              <input
+                className="field"
+                type="text"
+                value={newSkill}
+                onChange={(event) => setNewSkill(event.target.value)}
+                placeholder="add skill"
+              />
+              <button type="submit" className="btn btn-ghost btn-sm">+ add</button>
+            </form>
+          </div>
+        </div>
 
-        <section className="panel">
-          <h3>Weights</h3>
-          <label className="field">
-            <span>Skills weight: {skillsWeight}%</span>
-            <input
-              type="range"
-              min={20}
-              max={80}
-              value={skillsWeight}
-              onChange={(event) => setSkillsWeight(Number(event.target.value))}
-            />
-          </label>
-          <label className="field">
-            <span>Experience weight: {experienceWeight}%</span>
-            <input
-              type="range"
-              min={20}
-              max={80}
-              value={experienceWeight}
-              onChange={(event) => setExperienceWeight(Number(event.target.value))}
-            />
-          </label>
-          <button type="button" className="secondary-button" onClick={() => updateMutation.mutate()}>
-            {updateMutation.isPending ? "Saving..." : "Save Vacancy Configuration"}
-          </button>
-        </section>
+        <div className="panel">
+          <div className="panel-header">
+            <h2 className="panel-title">ranking weights</h2>
+          </div>
+          <div className="panel-body stack-16">
+            <div>
+              <div className="row-between" style={{ marginBottom: 8 }}>
+                <span className="mono-mute">skills weight</span>
+                <span className="num" style={{ fontWeight: 500 }}>{skillsWeight}%</span>
+              </div>
+              <input
+                type="range"
+                className="slider"
+                min={20}
+                max={80}
+                value={skillsWeight}
+                style={{ width: "100%" }}
+                onChange={(event) => setSkillsWeight(Number(event.target.value))}
+              />
+            </div>
+            <div>
+              <div className="row-between" style={{ marginBottom: 8 }}>
+                <span className="mono-mute">experience weight</span>
+                <span className="num" style={{ fontWeight: 500 }}>{experienceWeight}%</span>
+              </div>
+              <input
+                type="range"
+                className="slider"
+                min={20}
+                max={80}
+                value={experienceWeight}
+                style={{ width: "100%" }}
+                onChange={(event) => setExperienceWeight(Number(event.target.value))}
+              />
+            </div>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => updateMutation.mutate()}>
+              {updateMutation.isPending ? "saving..." : "save configuration"}
+            </button>
+          </div>
+        </div>
       </div>
+
+      <div style={{ height: 24 }} />
 
       <div className="panel">
-        <button type="button" className="primary-button" onClick={() => generateMutation.mutate()}>
-          {generateMutation.isPending ? "Running..." : "Generate Shortlist"}
-        </button>
+        <div className="panel-body">
+          <button type="button" className="btn btn-primary" onClick={() => generateMutation.mutate()}>
+            {generateMutation.isPending ? "running..." : "→ generate shortlist"}
+          </button>
+        </div>
       </div>
     </section>
   );

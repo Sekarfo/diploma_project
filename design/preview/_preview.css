@@ -1,0 +1,25 @@
+/* shared preview-card chrome */
+@import url("../colors_and_type.css");
+html, body { margin: 0; }
+body {
+  padding: 20px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+.card-row { display: grid; gap: 12px; }
+.card-row-3 { grid-template-columns: repeat(3, 1fr); }
+.card-row-4 { grid-template-columns: repeat(4, 1fr); }
+.card-row-5 { grid-template-columns: repeat(5, 1fr); }
+.swatch { display: flex; flex-direction: column; gap: 6px; }
+.swatch .chip {
+  height: 64px;
+  border-radius: 0;
+  border: 1px solid var(--color-hairline);
+}
+.swatch .chip.on-cream { background: var(--color-canvas); }
+.swatch .name { font-size: 13px; font-weight: 500; color: var(--color-ink); line-height: 1.4; }
+.swatch .hex  { font-size: 12px; color: var(--color-mute); line-height: 1.4; }
+.label-row { display:flex; align-items:baseline; gap:12px; }
+.label-row .lab { font-size: 12px; color: var(--color-mute); }
+.spec-block { display:flex; flex-direction:column; gap: 16px; }
+.spec-meta { font-size: 12px; color: var(--color-mute); }

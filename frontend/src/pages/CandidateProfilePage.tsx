@@ -13,62 +13,85 @@ export function CandidateProfilePage(): JSX.Element {
   });
 
   if (!query.data?.candidate) {
-    return <section className="panel loading-state">Candidate not found.</section>;
+    return <section className="screen is-active"><p className="mono-mute">Candidate not found.</p></section>;
   }
 
   const { candidate, evaluations } = query.data;
   const topEvaluation = evaluations[0];
 
   return (
-    <section className="page-stack">
-      <div className="panel-head">
-        <h1>{candidate.fullName}</h1>
+    <section className="screen is-active">
+      <header className="screen-header">
+        <div>
+          <h1 className="screen-title">{candidate.fullName.toLowerCase()}</h1>
+          <p className="screen-sub">
+            {candidate.headline} · {candidate.experienceYears}y · {candidate.location}
+          </p>
+        </div>
         {topEvaluation ? <ScoreBadge score={topEvaluation.matchScore} /> : null}
-      </div>
+      </header>
+      <hr className="screen-divider" />
 
-      <div className="split-grid">
-        <section className="panel">
-          <h3>Resume preview</h3>
-          <p className="muted">{candidate.resumePreview}</p>
-          <h4>Extracted structured data</h4>
-          <ul className="plain-list">
-            <li>Headline: {candidate.headline}</li>
-            <li>Experience: {candidate.experienceYears} years</li>
-            <li>Location: {candidate.location}</li>
-            <li>Skills: {candidate.skills.join(", ")}</li>
-          </ul>
-        </section>
+      <div className="two-col">
+        <div className="panel">
+          <div className="panel-header">
+            <h2 className="panel-title">resume preview</h2>
+          </div>
+          <div className="panel-body">
+            <p className="muted">{candidate.resumePreview}</p>
+            <div style={{ height: 16 }} />
+            <div className="kv-row">
+              <span className="kv-key">Headline</span>
+              <span className="kv-val">{candidate.headline}</span>
+            </div>
+            <div className="kv-row">
+              <span className="kv-key">Experience</span>
+              <span className="kv-val">{candidate.experienceYears} years</span>
+            </div>
+            <div className="kv-row">
+              <span className="kv-key">Location</span>
+              <span className="kv-val">{candidate.location}</span>
+            </div>
+            <div className="kv-row">
+              <span className="kv-key">Skills</span>
+              <span className="kv-val mono-mute">{candidate.skills.join(" · ")}</span>
+            </div>
+          </div>
+        </div>
 
-        <section className="panel">
-          <h3>Score breakdown</h3>
-          {evaluations.length === 0 ? (
-            <p className="muted">No shortlist scores yet for this candidate.</p>
-          ) : (
-            <div className="score-breakdown">
-              {evaluations.map((evaluation) => (
-                <div key={`${evaluation.vacancyId}-${evaluation.candidateId}`} className="score-row">
+        <div className="panel">
+          <div className="panel-header">
+            <h2 className="panel-title">score breakdown</h2>
+          </div>
+          <div className="panel-body">
+            {evaluations.length === 0 ? (
+              <p className="mono-mute">No shortlist scores yet for this candidate.</p>
+            ) : (
+              evaluations.map((evaluation) => (
+                <div key={`${evaluation.vacancyId}-${evaluation.candidateId}`} className="kv-row">
                   <div>
-                    <p>{evaluation.vacancy.title}</p>
-                    <p className="muted">
-                      Skills {evaluation.skillsMatch.toFixed(0)}% · Experience {evaluation.experienceScore.toFixed(0)}%
-                    </p>
+                    <div style={{ fontWeight: 500 }}>{evaluation.vacancy.title}</div>
+                    <div className="mono-mute">
+                      skills {evaluation.skillsMatch.toFixed(0)}% · exp {evaluation.experienceScore.toFixed(0)}%
+                    </div>
                   </div>
                   <ScoreBadge score={evaluation.matchScore} />
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
+              ))
+            )}
+          </div>
+        </div>
       </div>
 
       {topEvaluation ? (
-        <ExplanationPanel
-          title="Explanation Panel"
-          summary={topEvaluation.explanation}
-          factors={topEvaluation.explanationFactors}
-        />
+        <div style={{ marginTop: 24 }}>
+          <ExplanationPanel
+            title="shap-based factors"
+            summary={topEvaluation.explanation}
+            factors={topEvaluation.explanationFactors}
+          />
+        </div>
       ) : null}
     </section>
   );
 }
-
