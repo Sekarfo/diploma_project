@@ -1,4 +1,5 @@
 const AUTH_TOKEN_KEY = "hr_shortlist_auth_token";
+const THEME_KEY = "hr_shortlist_theme";
 
 const state = {
   authMode: "signin",
@@ -23,7 +24,6 @@ const signupForm = document.getElementById("signup-form");
 
 const signoutBtn = document.getElementById("signout-btn");
 const topbarUserNameEl = document.getElementById("topbar-user-name");
-const topbarUserEmailEl = document.getElementById("topbar-user-email");
 
 const pageButtons = {
   shortlist: document.getElementById("page-shortlist-btn"),
@@ -41,7 +41,8 @@ const modeExistingBtn = document.getElementById("mode-existing");
 const modeCustomBtn = document.getElementById("mode-custom");
 const existingForm = document.getElementById("existing-form");
 const customForm = document.getElementById("custom-form");
-const jobSelect = document.getElementById("job-select");
+const jobSearchInput = document.getElementById("job-search");
+const jobOptionsEl = document.getElementById("job-options");
 
 const vacancyTitleInput = document.getElementById("vacancy-title");
 const vacancyDescriptionInput = document.getElementById("vacancy-description");
@@ -70,6 +71,9 @@ const resumeModalTitleEl = document.getElementById("resume-modal-title");
 const resumeModalCloseEl = document.getElementById("resume-modal-close");
 const resumeModalBackdropEl = document.getElementById("resume-modal-backdrop");
 
+const themeLightBtn = document.getElementById("theme-light-btn");
+const themeDarkBtn = document.getElementById("theme-dark-btn");
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -96,21 +100,28 @@ function humanDate(value) {
   return date.toLocaleString();
 }
 
+function setTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  themeLightBtn.classList.toggle("is-active", theme === "light");
+  themeDarkBtn.classList.toggle("is-active", theme === "dark");
+  localStorage.setItem(THEME_KEY, theme);
+}
+
 function setAuthStatus(text, type = "") {
   authStatusEl.textContent = text || "";
-  authStatusEl.className = `mini-muted ${type}`.trim();
+  authStatusEl.className = `mini-muted auth-note ${type}`.trim();
 }
 
 function setAppStatus(text, type = "") {
   appStatusEl.textContent = text || "";
-  appStatusEl.className = `status ${type}`.trim();
+  appStatusEl.className = `app-msg ${type}`.trim();
 }
 
 function setAuthMode(mode) {
   state.authMode = mode;
   const isSignIn = mode === "signin";
-  authModeSignInBtn.classList.toggle("active", isSignIn);
-  authModeSignUpBtn.classList.toggle("active", !isSignIn);
+  authModeSignInBtn.classList.toggle("is-active", isSignIn);
+  authModeSignUpBtn.classList.toggle("is-active", !isSignIn);
   signinForm.classList.toggle("hidden", !isSignIn);
   signupForm.classList.toggle("hidden", isSignIn);
 }
@@ -118,19 +129,21 @@ function setAuthMode(mode) {
 function setPage(pageKey) {
   state.page = pageKey;
   Object.entries(pageButtons).forEach(([key, button]) => {
-    button.classList.toggle("active", key === pageKey);
+    const isActive = key === pageKey;
+    button.classList.toggle("is-active", isActive);
+    const glyph = button.querySelector(".nav-glyph");
+    if (glyph) glyph.textContent = isActive ? "[x]" : "[+]";
   });
   Object.entries(pageSections).forEach(([key, section]) => {
-    section.classList.toggle("hidden", key !== pageKey);
-    section.classList.toggle("active", key === pageKey);
+    section.classList.toggle("is-active", key === pageKey);
   });
 }
 
 function setShortlistMode(mode) {
   state.shortlistMode = mode;
   const isExisting = mode === "existing";
-  modeExistingBtn.classList.toggle("active", isExisting);
-  modeCustomBtn.classList.toggle("active", !isExisting);
+  modeExistingBtn.classList.toggle("is-active", isExisting);
+  modeCustomBtn.classList.toggle("is-active", !isExisting);
   existingForm.classList.toggle("hidden", !isExisting);
   customForm.classList.toggle("hidden", isExisting);
 }
@@ -142,11 +155,9 @@ function getAuthHeaders() {
 
 function applyUserToUi() {
   const user = state.currentUser || {};
-  topbarUserNameEl.textContent = user.full_name || user.email || "-";
-  topbarUserEmailEl.textContent = user.email || "-";
-
-  profileUserNameEl.textContent = user.full_name || "-";
-  profileUserEmailEl.textContent = user.email || "-";
+  topbarUserNameEl.textContent = user.full_name || user.email || "—";
+  profileUserNameEl.textContent = user.full_name || "—";
+  profileUserEmailEl.textContent = user.email || "—";
   profileUserRoleEl.textContent = user.role || "hr";
 }
 
@@ -233,15 +244,15 @@ function closeResumeModal() {
 }
 
 function updateResultsMeta(payload, extra = "") {
-  const text = [
-    `Vacancy: ${payload.job_id || payload.vacancy_title || "custom"}`,
-    `Candidates shown: ${payload.total_candidates ?? payload.returned_count ?? "-"}`,
-    `Top results: ${payload.top_k ?? "-"}`,
+  const vacancy = payload.job_title || payload.vacancy_title || payload.job_id || "custom vacancy";
+  const shown = payload.total_candidates ?? payload.returned_count ?? "-";
+  const evaluated = payload.retrieved_count ?? payload.num_candidates ?? "-";
+  const parts = [
+    `top ${shown} of ${evaluated} evaluated`,
+    `vacancy: ${vacancy}`,
     extra,
-  ]
-    .filter(Boolean)
-    .join(" | ");
-  resultsMetaEl.textContent = text;
+  ].filter(Boolean);
+  resultsMetaEl.textContent = parts.join(" · ");
 }
 
 function buildCandidateSummary(candidate) {
@@ -250,7 +261,7 @@ function buildCandidateSummary(candidate) {
   const missing = explanation.missing_skills || [];
 
   if (matched.length && missing.length) {
-    return `Matched skills: ${matched.slice(0, 4).join(", ")}. Missing: ${missing.slice(0, 3).join(", ")}.`;
+    return `Matched: ${matched.slice(0, 4).join(", ")}. Missing: ${missing.slice(0, 3).join(", ")}.`;
   }
   if (matched.length) {
     return `Strong skill alignment on: ${matched.slice(0, 5).join(", ")}.`;
@@ -267,12 +278,45 @@ function renderCandidateDetails(candidate) {
   const missing = (explanation.missing_skills || []).slice(0, 4);
   const positives = (explanation.top_positive_factors || []).slice(0, 3).map((item) => item.label).filter(Boolean);
 
-  return `
-    <div class="detail-item"><span>Matched skills</span><b>${escapeHtml(matched.join(", ") || "Not enough data")}</b></div>
-    <div class="detail-item"><span>Missing skills</span><b>${escapeHtml(missing.join(", ") || "None highlighted")}</b></div>
-    <div class="detail-item"><span>Experience fit</span><b>${escapeHtml(explanation.experience_summary || "Review resume for full context")}</b></div>
-    <div class="detail-item"><span>Why recommended</span><b>${escapeHtml(positives.join(", ") || "Strong overall relevance")}</b></div>
-  `;
+  const rows = [
+    ["matched skills", matched.join(", ") || "not enough data"],
+    ["missing skills", missing.join(", ") || "none highlighted"],
+    ["experience fit", explanation.experience_summary || "review resume for full context"],
+    ["why recommended", positives.join(", ") || "strong overall relevance"],
+  ];
+
+  return rows
+    .map(
+      ([key, val]) => `
+      <div class="kv-row">
+        <span class="kv-key">${escapeHtml(key)}</span>
+        <span class="kv-val">${escapeHtml(val)}</span>
+      </div>`
+    )
+    .join("");
+}
+
+function scoreToPercent(value) {
+  const v = numOr(value, 0);
+  return Math.max(0, Math.min(100, Math.round(v * 100)));
+}
+
+function matchTier(pct) {
+  if (pct >= 75) return "strong";
+  if (pct >= 50) return "good";
+  return "weak";
+}
+
+function makeAsciiBar(pct, width = 16) {
+  const filled = Math.round((pct / 100) * width);
+  return "█".repeat(filled) + "─".repeat(width - filled);
+}
+
+function makeResumeSnippet(text, maxLen = 260) {
+  const clean = String(text || "").replace(/\s+/g, " ").trim();
+  if (!clean) return 'Resume text is not available — click "view resume" for the source record.';
+  if (clean.length <= maxLen) return clean;
+  return clean.slice(0, maxLen).trimEnd() + "…";
 }
 
 function renderCandidates(payload) {
@@ -280,7 +324,8 @@ function renderCandidates(payload) {
   resultsEl.innerHTML = "";
 
   if (!candidates.length) {
-    resultsEl.innerHTML = '<div class="empty-state"><p>No candidates returned.</p></div>';
+    resultsEl.innerHTML =
+      '<p class="mono-mute results-hint">No candidates matched this vacancy. Try a broader description or increase the candidate pool.</p>';
     return;
   }
 
@@ -288,12 +333,23 @@ function renderCandidates(payload) {
 
   candidates.forEach((candidate) => {
     const node = candidateTemplate.content.cloneNode(true);
-    const fusedScore = numOr(candidate.final_fusion_score ?? candidate.score, 0);
+    const fusedScore = candidate.final_fusion_score ?? candidate.score;
+    const pct = scoreToPercent(fusedScore);
+    const tier = matchTier(pct);
 
-    node.querySelector(".rank-pill").textContent = `Rank #${candidate.final_rank}`;
-    node.querySelector(".resume-id").textContent = candidate.resume_id;
-    node.querySelector(".score-fused").textContent = fmt(fusedScore, 4);
+    node.querySelector(".rank-pill").textContent = `#${candidate.final_rank}`;
+    node.querySelector(".resume-id").textContent = `Candidate ${candidate.resume_id}`;
+
+    const scoreEl = node.querySelector(".score-fused");
+    scoreEl.textContent = `${pct}%`;
+    if (tier === "strong") scoreEl.classList.add("badge-success");
+    else if (tier === "good") scoreEl.classList.add("badge-warning");
+    else scoreEl.classList.add("badge-danger");
+
+    node.querySelector(".score-bar-ascii").textContent = makeAsciiBar(pct);
+
     node.querySelector(".candidate-summary").textContent = buildCandidateSummary(candidate);
+    node.querySelector(".resume-snippet-box").textContent = makeResumeSnippet(candidate.resume_text);
 
     const detailsEl = node.querySelector(".details-grid");
     detailsEl.innerHTML = renderCandidateDetails(candidate);
@@ -341,7 +397,7 @@ async function loadHistoryRun(runId) {
       candidates: mapHistoryDetailToCandidates(detail),
     };
 
-    updateResultsMeta(mapped, "Loaded from profile history");
+    updateResultsMeta(mapped, "loaded from history");
     renderCandidates(mapped);
     setPage("shortlist");
     setAppStatus("History shortlist loaded.", "ok");
@@ -354,23 +410,22 @@ function renderHistoryList(runs) {
   historyListEl.innerHTML = "";
 
   if (!runs || !runs.length) {
-    historyListEl.innerHTML = "<p class='mini-muted'>No shortlist history yet.</p>";
+    historyListEl.innerHTML = "<p class='mono-mute panel-empty'>No shortlist history yet.</p>";
     return;
   }
 
   const fragment = document.createDocumentFragment();
   runs.forEach((run) => {
-    const item = document.createElement("article");
-    item.className = "list-item";
+    const item = document.createElement("div");
+    item.className = "pipeline-row";
 
-    const label = run.vacancy_title || (run.existing_job_id ? `Existing job: ${run.existing_job_id}` : "Custom vacancy");
+    const label = run.vacancy_title || (run.existing_job_id ? `${run.existing_job_id}` : "Custom vacancy");
     item.innerHTML = `
-      <div class="list-item-head">
-        <h4>${escapeHtml(label)}</h4>
-        <button type="button" class="chip-btn open-history-btn">Open</button>
+      <div>
+        <div class="pipeline-name">${escapeHtml(label)}</div>
+        <div class="pipeline-sub">${escapeHtml(humanDate(run.created_at))} · ${escapeHtml(String(run.returned_count))} candidates</div>
       </div>
-      <p>${escapeHtml(humanDate(run.created_at))}</p>
-      <p>Candidates shown: <b>${escapeHtml(run.returned_count)}</b></p>
+      <button type="button" class="btn btn-ghost btn-sm open-history-btn">open</button>
     `;
 
     const button = item.querySelector(".open-history-btn");
@@ -385,21 +440,19 @@ function renderVacancyList(vacancies) {
   vacancyListEl.innerHTML = "";
 
   if (!vacancies || !vacancies.length) {
-    vacancyListEl.innerHTML = "<p class='mini-muted'>You have not added custom vacancies yet.</p>";
+    vacancyListEl.innerHTML = "<p class='mono-mute panel-empty'>No custom vacancies yet.</p>";
     return;
   }
 
   const fragment = document.createDocumentFragment();
   vacancies.forEach((vacancy) => {
-    const item = document.createElement("article");
-    item.className = "list-item";
+    const item = document.createElement("div");
+    item.className = "pipeline-row";
     item.innerHTML = `
-      <div class="list-item-head">
-        <h4>${escapeHtml(vacancy.title || "Untitled vacancy")}</h4>
-        <span class="mini-badge">${escapeHtml(vacancy.source || "manual")}</span>
+      <div>
+        <div class="pipeline-name">${escapeHtml(vacancy.title || "Untitled vacancy")}</div>
+        <div class="pipeline-sub">${escapeHtml(humanDate(vacancy.created_at))} · <span class="badge">${escapeHtml(vacancy.source || "manual")}</span></div>
       </div>
-      <p>Created: <b>${escapeHtml(humanDate(vacancy.created_at))}</b></p>
-      <p>${escapeHtml(vacancy.description_preview || "No description preview")}</p>
     `;
     fragment.appendChild(item);
   });
@@ -412,51 +465,61 @@ function renderGlobalExplanation(payload) {
   const rows = features
     .slice(0, 12)
     .map((feature, index) => {
-      const width = Math.max(6, Math.min(100, numOr(feature.mean_abs_shap, 0) * 100));
+      const ratio = Math.max(0, Math.min(1, numOr(feature.mean_abs_shap, 0)));
+      const filled = Math.round(ratio * 36);
+      const bar = "█".repeat(filled) + "─".repeat(36 - filled);
       return `
-        <div class="global-shap-row">
-          <div class="global-shap-rank">#${index + 1}</div>
-          <div class="global-shap-content">
-            <div class="global-shap-label">${escapeHtml(feature.label)}</div>
-            <div class="global-shap-bar"><span style="width:${width}%"></span></div>
-            <div class="global-shap-meta">mean |SHAP| = ${fmt(feature.mean_abs_shap, 5)} | mean SHAP = ${fmt(feature.mean_shap, 5)}</div>
+        <div class="shap-item">
+          <span class="shap-rank">#${index + 1}</span>
+          <div class="shap-content">
+            <div class="shap-feature-name">${escapeHtml(feature.label)}</div>
+            <div class="shap-ascii-bar">${escapeHtml(bar)}</div>
+            <div class="shap-meta">mean |SHAP| = ${fmt(feature.mean_abs_shap, 5)} · mean SHAP = ${fmt(feature.mean_shap, 5)}</div>
           </div>
         </div>
       `;
     })
     .join("");
 
-  globalShapListEl.innerHTML = rows || "<p class='mini-muted'>No SHAP summary available yet.</p>";
-  globalExplainerMetaEl.textContent = `Based on ${payload.validation_rows ?? 0} validation rows`;
+  globalShapListEl.innerHTML = rows || "<p class='mono-mute'>No SHAP summary available yet.</p>";
+  globalExplainerMetaEl.textContent = `based on ${payload.validation_rows ?? 0} validation rows`;
 
   const glossary = (payload.feature_glossary || [])
-    .map((item) => {
-      return `
-        <article class="glossary-item">
-          <div class="list-item-head">
-            <h4>${escapeHtml(item.label)}</h4>
-            <span class="mini-badge">${item.used_in_model ? "Used" : "Not used"}</span>
-          </div>
-          <p>${escapeHtml(item.description)}</p>
-        </article>
-      `;
-    })
+    .map(
+      (item) => `
+      <div class="pipeline-row">
+        <div>
+          <div class="pipeline-name">${escapeHtml(item.label)}</div>
+          <div class="pipeline-sub">${escapeHtml(item.description)}</div>
+        </div>
+        <span class="badge ${item.used_in_model ? "badge-success" : ""}">${item.used_in_model ? "used" : "unused"}</span>
+      </div>`
+    )
     .join("");
 
-  featureGlossaryListEl.innerHTML = glossary || "<p class='mini-muted'>No glossary available.</p>";
+  featureGlossaryListEl.innerHTML = glossary || "<p class='mono-mute panel-empty'>No glossary available.</p>";
 }
 
 async function loadJobs() {
   const data = await apiGet("/jobs", { authRequired: true });
   state.jobs = data.jobs || [];
-  jobSelect.innerHTML = "";
+  jobOptionsEl.innerHTML = "";
 
   state.jobs.forEach((job) => {
     const option = document.createElement("option");
-    option.value = job.job_id;
-    option.textContent = `${job.job_title} (${job.job_id})`;
-    jobSelect.appendChild(option);
+    option.value = `${job.job_title} — ${job.job_id}`;
+    jobOptionsEl.appendChild(option);
   });
+}
+
+function resolveSelectedJobId() {
+  const raw = (jobSearchInput.value || "").trim();
+  if (!raw) return "";
+  const dashSplit = raw.split("—").map((s) => s.trim());
+  const tail = dashSplit[dashSplit.length - 1];
+  if (state.jobs.some((j) => j.job_id === tail)) return tail;
+  const byTitle = state.jobs.find((j) => j.job_title.toLowerCase() === raw.toLowerCase());
+  return byTitle ? byTitle.job_id : "";
 }
 
 async function loadVacancies() {
@@ -472,8 +535,8 @@ async function loadHistory() {
 }
 
 async function loadGlobalExplanation() {
-  globalExplainerMetaEl.textContent = "Loading SHAP summary...";
-  globalShapListEl.innerHTML = "<p class='mini-muted'>Loading...</p>";
+  globalExplainerMetaEl.textContent = "loading SHAP summary...";
+  globalShapListEl.innerHTML = "<p class='mono-mute'>Loading...</p>";
   featureGlossaryListEl.innerHTML = "";
 
   try {
@@ -481,7 +544,7 @@ async function loadGlobalExplanation() {
     renderGlobalExplanation(data);
   } catch (error) {
     globalExplainerMetaEl.textContent = "SHAP summary unavailable";
-    globalShapListEl.innerHTML = "<p class='mini-muted'>SHAP artifacts are not available yet.</p>";
+    globalShapListEl.innerHTML = "<p class='mono-mute'>SHAP artifacts are not available yet.</p>";
     featureGlossaryListEl.innerHTML = "";
   }
 }
@@ -500,7 +563,7 @@ async function loadAppData() {
   try {
     setAppStatus("Loading workspace data...", "ok");
     await Promise.all([loadJobs(), loadGlobalExplanation(), loadVacancies(), loadHistory()]);
-    setAppStatus("Workspace is ready.", "ok");
+    setAppStatus("Workspace ready.", "ok");
   } catch (error) {
     setAppStatus(error.message || "Failed to load workspace data.", "error");
   }
@@ -508,10 +571,15 @@ async function loadAppData() {
 
 existingForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const jobId = resolveSelectedJobId();
+  if (!jobId) {
+    setAppStatus("Please pick a vacancy from the suggestions list first.", "error");
+    return;
+  }
   try {
-    setAppStatus("Building shortlist...", "ok");
+    setAppStatus("Searching candidates and re-ranking with the ML model…", "ok");
     const payload = {
-      job_id: jobSelect.value,
+      job_id: jobId,
       top_k: Number(document.getElementById("existing-topk").value || 20),
       num_candidates: Number(document.getElementById("existing-num-candidates").value || 100),
     };
@@ -520,7 +588,7 @@ existingForm.addEventListener("submit", async (event) => {
     updateResultsMeta(data);
     renderCandidates(data);
     await Promise.all([loadHistory(), loadVacancies()]);
-    setAppStatus("Shortlist generated and saved to profile history.", "ok");
+    setAppStatus("Shortlist ready. Open candidate cards for details.", "ok");
   } catch (error) {
     setAppStatus(error.message || "Failed to build shortlist.", "error");
   }
@@ -529,7 +597,7 @@ existingForm.addEventListener("submit", async (event) => {
 customForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
-    setAppStatus("Building shortlist for custom vacancy...", "ok");
+    setAppStatus("Searching candidates and re-ranking with the ML model…", "ok");
 
     const rawSkills = vacancySkillsInput.value || "";
     const parsedSkills = rawSkills
@@ -548,7 +616,7 @@ customForm.addEventListener("submit", async (event) => {
     };
 
     const data = await apiPost("/shortlist/vacancy", payload, { authRequired: true });
-    const extra = data.proxy_job_id ? `Proxy job used for embedding: ${data.proxy_job_id}` : "";
+    const extra = data.proxy_job_id ? `proxy: ${data.proxy_job_id}` : "";
     updateResultsMeta(data, extra);
     renderCandidates(data);
     await Promise.all([loadHistory(), loadVacancies()]);
@@ -561,7 +629,7 @@ customForm.addEventListener("submit", async (event) => {
 signinForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
-    setAuthStatus("Signing in...", "ok");
+    setAuthStatus("Signing in…", "ok");
     const payload = {
       email: document.getElementById("signin-email").value.trim(),
       password: document.getElementById("signin-password").value,
@@ -578,7 +646,7 @@ signinForm.addEventListener("submit", async (event) => {
 signupForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
-    setAuthStatus("Creating account...", "ok");
+    setAuthStatus("Creating account…", "ok");
     const payload = {
       full_name: document.getElementById("signup-fullname").value.trim(),
       email: document.getElementById("signup-email").value.trim(),
@@ -599,7 +667,7 @@ signoutBtn.addEventListener("click", async () => {
       await apiPost("/auth/signout", {}, { authRequired: true });
     }
   } catch (_) {
-    // local signout still continues
+    // local signout continues regardless
   } finally {
     clearSession();
     setAuthMode("signin");
@@ -608,7 +676,7 @@ signoutBtn.addEventListener("click", async () => {
 
 historyRefreshBtn.addEventListener("click", async () => {
   try {
-    setAppStatus("Refreshing shortlist history...", "ok");
+    setAppStatus("Refreshing shortlist history…", "ok");
     await loadHistory();
     setAppStatus("Shortlist history updated.", "ok");
   } catch (error) {
@@ -618,7 +686,7 @@ historyRefreshBtn.addEventListener("click", async () => {
 
 vacanciesRefreshBtn.addEventListener("click", async () => {
   try {
-    setAppStatus("Refreshing vacancy list...", "ok");
+    setAppStatus("Refreshing vacancy list…", "ok");
     await loadVacancies();
     setAppStatus("Vacancy list updated.", "ok");
   } catch (error) {
@@ -636,15 +704,19 @@ modeCustomBtn.addEventListener("click", () => setShortlistMode("custom"));
 authModeSignInBtn.addEventListener("click", () => setAuthMode("signin"));
 authModeSignUpBtn.addEventListener("click", () => setAuthMode("signup"));
 
+themeLightBtn.addEventListener("click", () => setTheme("light"));
+themeDarkBtn.addEventListener("click", () => setTheme("dark"));
+
 resumeModalCloseEl.addEventListener("click", closeResumeModal);
 resumeModalBackdropEl.addEventListener("click", closeResumeModal);
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
-    closeResumeModal();
-  }
+  if (event.key === "Escape") closeResumeModal();
 });
 
 async function boot() {
+  const savedTheme = localStorage.getItem(THEME_KEY) || "dark";
+  setTheme(savedTheme);
+
   setAuthMode("signin");
   setPage("shortlist");
   setShortlistMode("existing");

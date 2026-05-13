@@ -374,7 +374,7 @@ class HistoryService:
                             num_candidates,
                             retrieved_count,
                             returned_count,
-                            "xgb_ranker.joblib",
+                            str(self.settings.ranker_model_candidates[0].name) if self.settings.ranker_model_candidates else "unknown",
                             self.settings.elasticsearch_index_name,
                             json.dumps(request_payload),
                             latency_ms,

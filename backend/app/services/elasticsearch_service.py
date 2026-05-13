@@ -1,18 +1,38 @@
 from __future__ import annotations
 
 import logging
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
-from elasticsearch import Elasticsearch
+from elasticsearch import Elasticsearch, ConnectionError as ESConnectionError
 
 from backend.app.config import Settings, get_settings
 from backend.app.services.errors import ElasticsearchUnavailableError
 from backend.app.services.runtime_utils import parse_list_col, to_float
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def _get_es_client(settings: Settings) -> Elasticsearch:
+    """Module-level singleton ES client — created once, reused across requests."""
+    kwargs: dict[str, Any] = {
+        "hosts": [settings.elasticsearch_url],
+        "request_timeout": 60,
+        "verify_certs": False,
+        "retry_on_timeout": True,
+        "max_retries": 2,
+    }
+    if settings.elasticsearch_username and settings.elasticsearch_password:
+        kwargs["basic_auth"] = (
+            settings.elasticsearch_username,
+            settings.elasticsearch_password,
+        )
+    logger.info("Creating Elasticsearch client for %s", settings.elasticsearch_url)
+    return Elasticsearch(**kwargs)
 
 
 class ElasticsearchRetrievalService:
@@ -24,31 +44,8 @@ class ElasticsearchRetrievalService:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
 
-    def _connect(self) -> Elasticsearch:
-        kwargs: dict[str, Any] = {
-            "hosts": [self.settings.elasticsearch_url],
-            "request_timeout": 60,
-            "verify_certs": False,
-        }
-        if self.settings.elasticsearch_username and self.settings.elasticsearch_password:
-            kwargs["basic_auth"] = (
-                self.settings.elasticsearch_username,
-                self.settings.elasticsearch_password,
-            )
-
-        try:
-            client = Elasticsearch(**kwargs)
-            if not client.ping():
-                raise ElasticsearchUnavailableError(
-                    f"Could not connect to Elasticsearch at {self.settings.elasticsearch_url}"
-                )
-            return client
-        except ElasticsearchUnavailableError:
-            raise
-        except Exception as exc:
-            raise ElasticsearchUnavailableError(
-                f"Elasticsearch connection failed: {exc}"
-            ) from exc
+    def _client(self) -> Elasticsearch:
+        return _get_es_client(self.settings)
 
     def retrieve_hits(
         self,
@@ -61,11 +58,7 @@ class ElasticsearchRetrievalService:
         query_skills: list[str] | None = None,
         query_title: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Hybrid retrieval: kNN over dense embedding + lexical BM25 over text/skills/titles.
-
-        When `query_text` / `query_skills` / `query_title` are omitted the call degrades to
-        a pure kNN search, matching the previous behavior.
-        """
+        """Hybrid retrieval: kNN over dense embedding + lexical BM25 over text/skills/titles."""
         index = index_name or self.settings.elasticsearch_index_name
         knn_block = {
             "field": "embedding",
@@ -127,7 +120,7 @@ class ElasticsearchRetrievalService:
             search_kwargs["query"] = {"bool": {"should": should_clauses, "minimum_should_match": 0}}
 
         try:
-            client = self._connect()
+            client = self._client()
             response = client.search(**search_kwargs)
             hits = response.get("hits", {}).get("hits", [])
             for hit in hits:
@@ -138,6 +131,10 @@ class ElasticsearchRetrievalService:
                 "hybrid" if should_clauses else "knn",
             )
             return hits
+        except ESConnectionError as exc:
+            raise ElasticsearchUnavailableError(
+                f"Could not connect to Elasticsearch at {self.settings.elasticsearch_url}"
+            ) from exc
         except ElasticsearchUnavailableError:
             raise
         except Exception as exc:

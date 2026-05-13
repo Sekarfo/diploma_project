@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sys
 from contextlib import contextmanager
 from typing import Generator
@@ -7,10 +8,66 @@ from typing import Generator
 from backend.app.config import get_settings
 from backend.app.services.errors import DatabaseUnavailableError
 
+logger = logging.getLogger(__name__)
+
 try:
     import psycopg
-except Exception:  # pragma: no cover - import guard for environments without driver
+    from psycopg_pool import ConnectionPool
+except Exception:  # pragma: no cover
     psycopg = None  # type: ignore[assignment]
+    ConnectionPool = None  # type: ignore[assignment]
+
+
+_pool: "ConnectionPool | None" = None
+
+
+def _require_psycopg() -> None:
+    if psycopg is None or ConnectionPool is None:
+        raise DatabaseUnavailableError(
+            (
+                "Missing dependency: psycopg / psycopg-pool. "
+                f"Current interpreter: {sys.executable}. "
+                "Run: pip install 'psycopg[binary]>=3.2.0' psycopg-pool>=3.2.0"
+            )
+        )
+
+
+def _get_pool() -> "ConnectionPool":
+    """Return the module-level connection pool, creating it on first call."""
+    global _pool
+    _require_psycopg()
+    if _pool is None:
+        settings = get_settings()
+        _pool = ConnectionPool(
+            settings.database_url,
+            min_size=1,
+            max_size=10,
+            open=True,
+            reconnect_timeout=30,
+        )
+        logger.info(
+            "PostgreSQL connection pool created (min=1 max=10) → %s",
+            settings.database_url.split("@")[-1],  # log host/db, not credentials
+        )
+    return _pool
+
+
+@contextmanager
+def db_connection() -> Generator:
+    """Yield a connection from the pool; auto-commit on success, rollback on error."""
+    pool = _get_pool()
+    try:
+        with pool.connection() as connection:
+            try:
+                yield connection
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+    except DatabaseUnavailableError:
+        raise
+    except Exception as exc:
+        raise DatabaseUnavailableError(f"Failed to get DB connection from pool: {exc}") from exc
 
 
 _SCHEMA_STATEMENTS = [
@@ -108,6 +165,8 @@ _SCHEMA_STATEMENTS = [
     "CREATE INDEX IF NOT EXISTS idx_runs_user_created ON shortlist_runs(user_id, created_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_candidates_run_rank ON shortlist_candidates(run_id, final_rank)",
     "CREATE INDEX IF NOT EXISTS idx_feedback_run ON recruiter_feedback(run_id)",
+    # Fix #5: partial index on active sessions token hash — avoids full table scan on every auth request
+    "CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON user_sessions(refresh_token_hash) WHERE revoked_at IS NULL",
 ]
 
 _MIGRATION_STATEMENTS = [
@@ -137,38 +196,9 @@ _MIGRATION_STATEMENTS = [
     "ALTER TABLE vacancies ADD COLUMN IF NOT EXISTS years_required DOUBLE PRECISION",
     "ALTER TABLE vacancies ADD COLUMN IF NOT EXISTS skills_norm JSONB NOT NULL DEFAULT '[]'::jsonb",
     "ALTER TABLE vacancies ADD COLUMN IF NOT EXISTS parser_payload JSONB",
+    # Fix #5: add token index on existing DBs (idempotent via IF NOT EXISTS)
+    "CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON user_sessions(refresh_token_hash) WHERE revoked_at IS NULL",
 ]
-
-
-def _require_psycopg() -> None:
-    if psycopg is None:
-        raise DatabaseUnavailableError(
-            (
-                "Missing dependency: psycopg. "
-                f"Current interpreter: {sys.executable}. "
-                "Run backend with the project venv interpreter, for example: "
-                ".venv_app\\Scripts\\python.exe -m uvicorn backend.app.main:app --reload"
-            )
-        )
-
-
-@contextmanager
-def db_connection() -> Generator:
-    _require_psycopg()
-    settings = get_settings()
-    try:
-        connection = psycopg.connect(settings.database_url)
-    except Exception as exc:
-        raise DatabaseUnavailableError(f"Failed to connect to PostgreSQL: {exc}") from exc
-
-    try:
-        yield connection
-        connection.commit()
-    except Exception:
-        connection.rollback()
-        raise
-    finally:
-        connection.close()
 
 
 def ensure_postgres_schema() -> None:

@@ -25,6 +25,7 @@ from backend.app.schemas import (
     VacancyShortlistRequest,
     VacancyShortlistResponse,
 )
+from backend.app.limiter import limiter
 from backend.app.services import (
     AuthenticatedUser,
     AuthService,
@@ -36,6 +37,7 @@ from backend.app.services import (
     get_model_explanation_service,
     get_runtime_metrics_service,
 )
+from backend.app.services.db_service import db_connection
 from backend.app.services.errors import (
     ArtifactLoadError,
     AuthenticationError,
@@ -87,8 +89,29 @@ def _map_error_to_http(exc: Exception) -> HTTPException:
 
 
 @router.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health() -> dict:
+    checks: dict[str, str] = {}
+
+    # Database check
+    try:
+        with db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+        checks["database"] = "ok"
+    except Exception as exc:
+        logger.warning("Health check: database unavailable — %s", exc)
+        checks["database"] = "unavailable"
+
+    # ML artifacts check
+    try:
+        get_shortlist_service().artifact_service.get_artifacts()
+        checks["artifacts"] = "ok"
+    except Exception as exc:
+        logger.warning("Health check: artifacts unavailable — %s", exc)
+        checks["artifacts"] = "unavailable"
+
+    overall = "ok" if all(v == "ok" for v in checks.values()) else "degraded"
+    return {"status": overall, **checks}
 
 
 @router.post("/auth/signup", response_model=AuthResponse)
@@ -262,7 +285,9 @@ def get_global_model_explanation() -> GlobalModelExplanationResponse:
 
 
 @router.post("/shortlist", response_model=ShortlistResponse)
+@limiter.limit("20/minute")
 def shortlist(
+    request: Request,
     payload: ShortlistRequest,
     current_user: AuthenticatedUser = Depends(get_current_user),
     history_service: HistoryService = Depends(get_history_service),
@@ -311,7 +336,9 @@ def shortlist(
 
 
 @router.post("/shortlist/vacancy", response_model=VacancyShortlistResponse)
+@limiter.limit("20/minute")
 def shortlist_for_vacancy(
+    request: Request,
     payload: VacancyShortlistRequest,
     current_user: AuthenticatedUser = Depends(get_current_user),
     history_service: HistoryService = Depends(get_history_service),
@@ -360,3 +387,4 @@ def shortlist_for_vacancy(
     except Exception as exc:
         logger.exception("POST /shortlist/vacancy failed user_id=%s: %s", current_user.user_id, exc)
         raise _map_error_to_http(exc) from exc
+

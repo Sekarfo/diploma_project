@@ -31,7 +31,7 @@ services:
       - recruitment_net
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: recruitment_postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -62,6 +62,9 @@ services:
       DB_SCHEMA_AUTOCREATE: "true"
       AUTH_PASSWORD_PEPPER: ${AUTH_PASSWORD_PEPPER:-change-me-in-prod}
       AUTH_SESSION_TTL_MINUTES: ${AUTH_SESSION_TTL_MINUTES:-10080}
+      CROSS_ENCODER_MODEL: ${CROSS_ENCODER_MODEL:-cross-encoder/ms-marco-MiniLM-L-12-v2}
+      CROSS_ENCODER_MAX_LENGTH: ${CROSS_ENCODER_MAX_LENGTH:-512}
+      CROSS_ENCODER_BATCH_SIZE: ${CROSS_ENCODER_BATCH_SIZE:-64}
       PYTHONPATH: /app
     ports:
       - "8000:8000"
@@ -82,7 +85,7 @@ services:
       dockerfile: docker/frontend/Dockerfile
     container_name: recruitment_frontend
     ports:
-      - "8080:80"
+      - "80:80"
     depends_on:
       - backend
     networks:

@@ -1,22 +1,34 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
+from backend.app.config import get_settings
 from backend.app.services.artifact_service import RuntimeArtifacts
+from backend.app.services.cross_encoder_service import (
+    CrossEncoderService,
+    get_cross_encoder_service,
+)
 from backend.app.services.errors import RankingError
 from backend.app.services.runtime_utils import parse_list_col, title_overlap_ratio, to_float
 from src.ml.features import engineer_features
+
+logger = logging.getLogger(__name__)
 
 
 class FeatureBuilderService:
     """Builds runtime ranker features that match training schema exactly.
 
-    Cross-encoder is used only OFFLINE for label generation (data/generate_labels.py).
-    Inference path is structured-features-only: ES retrieve -> LightGBM rank.
+    Calls the cross-encoder on retrieved candidates to populate `ce_score`, which
+    is then consumed by `engineer_features()` to derive `ce_score_x_skill` — the
+    single distilled CE signal exposed to the LightGBM ranker.
     """
+
+    def __init__(self, cross_encoder: CrossEncoderService | None = None) -> None:
+        self._cross_encoder = cross_encoder
 
     def build_features_for_hits(
         self,
@@ -118,5 +130,44 @@ class FeatureBuilderService:
             return pd.DataFrame(rows)
 
         base_df = pd.DataFrame(rows)
+        base_df = self._attach_cross_encoder_scores(base_df, job_row=job_row)
         engineered_df = engineer_features(base_df)
         return engineered_df
+
+    def _attach_cross_encoder_scores(
+        self,
+        df: pd.DataFrame,
+        *,
+        job_row: pd.Series,
+    ) -> pd.DataFrame:
+        if df.empty:
+            df["ce_score"] = []
+            return df
+
+        settings = get_settings()
+        try:
+            service = self._cross_encoder or get_cross_encoder_service(settings)
+        except Exception as exc:
+            logger.warning("Cross-encoder unavailable, falling back to ce_score=0.5: %s", exc)
+            df["ce_score"] = 0.5
+            return df
+
+        job_text = str(
+            job_row.get("job_text")
+            or " ".join(
+                str(job_row.get(field, "") or "") for field in ("job_title", "job_description")
+            )
+        ).strip()
+
+        pairs: list[tuple[str, str]] = [
+            (job_text, str(text or "")) for text in df["resume_text"].tolist()
+        ]
+        try:
+            scores = service.score_pairs(pairs, batch_size=settings.cross_encoder_batch_size)
+        except Exception as exc:
+            logger.warning("Cross-encoder scoring failed, falling back to ce_score=0.5: %s", exc)
+            df["ce_score"] = 0.5
+            return df
+
+        df["ce_score"] = scores.astype(float)
+        return df

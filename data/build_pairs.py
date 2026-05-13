@@ -1,19 +1,4 @@
-"""
-Build candidate (job, resume) pairs with interpretable ranking features.
 
-Inputs:
-    resumes_consolidated.csv        (with person_id, past_titles, skills,
-                                    total_years_experience, etc.)
-    jobs_clean.csv                  (with job_id, job_title, job_skills_norm,
-                                    job_years_required)
-    resume_embeddings.npy           (N_resumes, 384), L2-normalized
-    resume_ids.npy                  (N_resumes,) parallel person_ids
-    job_embeddings.npy              (N_jobs, 384), L2-normalized
-    job_ids.npy                     (N_jobs,) parallel job_ids
-
-Output:
-    pair_features.csv               ~115k rows of (job_id, resume_id, features...)
-"""
 
 from pathlib import Path
 import ast

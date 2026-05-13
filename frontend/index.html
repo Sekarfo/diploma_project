@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -7,272 +7,384 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/ui/styles.css" />
   </head>
   <body>
-    <div class="page-bg"></div>
 
+    <!-- ===== AUTH SCREEN ===== -->
     <section id="auth-screen" class="auth-screen">
       <article class="auth-card">
-        <p class="eyebrow">Decision Support MVP</p>
-        <h1>HR Shortlist Studio</h1>
-        <p class="auth-intro">
-          Sign in to your HR account to create shortlists, track history, and review model insights.
-        </p>
+        <div class="brand auth-brand-section">
+          <div class="brand-mark">selects.</div>
+          <div class="brand-sub">HR shortlist · candidate ranking console</div>
+        </div>
+        <hr />
 
-        <div class="auth-tabs">
-          <button id="auth-mode-signin" type="button" class="chip-btn active">Sign In</button>
-          <button id="auth-mode-signup" type="button" class="chip-btn">Sign Up</button>
+        <div class="auth-tabs-row">
+          <div class="tabs">
+            <button id="auth-mode-signin" type="button" class="tab is-active">sign in</button>
+            <button id="auth-mode-signup" type="button" class="tab">sign up</button>
+          </div>
         </div>
 
-        <form id="signin-form" class="form-grid">
-          <label class="field">
-            <span>Email</span>
-            <input id="signin-email" type="email" placeholder="hr@company.com" required />
-          </label>
-          <label class="field">
-            <span>Password</span>
-            <input id="signin-password" type="password" placeholder="********" required />
-          </label>
-          <button class="action-btn" type="submit">Sign In</button>
-        </form>
-
-        <form id="signup-form" class="form-grid hidden">
-          <label class="field">
-            <span>Full Name</span>
-            <input id="signup-fullname" type="text" placeholder="Aruzhan HR" required />
-          </label>
-          <label class="field">
-            <span>Email</span>
-            <input id="signup-email" type="email" placeholder="hr@company.com" required />
-          </label>
-          <label class="field">
-            <span>Password</span>
-            <input id="signup-password" type="password" placeholder="Minimum 8 chars" required />
-          </label>
-          <button class="action-btn" type="submit">Create Account</button>
-        </form>
-
-        <p id="auth-status" class="mini-muted">Use your HR credentials to continue.</p>
-      </article>
-    </section>
-
-    <section id="app-shell" class="app-shell hidden">
-      <header class="app-topbar">
-        <div>
-          <p class="eyebrow">Decision Support MVP</p>
-          <h2>HR Shortlist Studio</h2>
-        </div>
-        <div class="topbar-actions">
-          <div class="user-pill">
-            <b id="topbar-user-name">-</b>
-            <span id="topbar-user-email">-</span>
-          </div>
-          <button id="signout-btn" type="button" class="chip-btn">Sign Out</button>
-        </div>
-      </header>
-
-      <nav class="app-nav">
-        <button id="page-shortlist-btn" type="button" class="nav-btn active">Shortlist Candidates</button>
-        <button id="page-profile-btn" type="button" class="nav-btn">My Profile</button>
-        <button id="page-insights-btn" type="button" class="nav-btn">Insights</button>
-      </nav>
-
-      <p id="app-status" class="status"></p>
-
-      <main class="page-stack">
-        <section id="page-shortlist" class="page active">
-          <div class="shortlist-layout">
-            <article class="panel control-panel">
-              <div class="section-head">
-                <h3>Create Shortlist</h3>
-              </div>
-
-              <div class="mode-toggle">
-                <button id="mode-existing" class="chip-btn active" type="button">Use Existing Vacancy</button>
-                <button id="mode-custom" class="chip-btn" type="button">Add Vacancy</button>
-              </div>
-
-              <form id="existing-form" class="form-grid">
-                <label class="field">
-                  <span>Vacancy</span>
-                  <select id="job-select" required></select>
-                </label>
-                <div class="row-2">
-                  <label class="field field-inline">
-                    <span>Top K</span>
-                    <input id="existing-topk" type="number" min="1" max="200" value="20" />
-                  </label>
-                  <label class="field field-inline">
-                    <span>Candidate Pool</span>
-                    <input id="existing-num-candidates" type="number" min="1" max="5000" value="100" />
-                  </label>
-                </div>
-                <button class="action-btn" type="submit">Build Shortlist</button>
-              </form>
-
-              <form id="custom-form" class="form-grid hidden">
-                <label class="field">
-                  <span>Vacancy Title</span>
-                  <input id="vacancy-title" type="text" placeholder="Senior Data Scientist" required />
-                </label>
-                <label class="field">
-                  <span>Vacancy Description</span>
-                  <textarea id="vacancy-description" rows="6" placeholder="Paste vacancy text here..." required></textarea>
-                </label>
-                <div class="row-2">
-                  <label class="field">
-                    <span>Years Required (optional)</span>
-                    <input id="vacancy-years" type="number" min="0" max="60" step="0.5" placeholder="3" />
-                  </label>
-                  <label class="field">
-                    <span>Skills CSV (optional)</span>
-                    <input id="vacancy-skills" type="text" placeholder="python, sql, spark" />
-                  </label>
-                </div>
-                <div class="row-2">
-                  <label class="field field-inline">
-                    <span>Top K</span>
-                    <input id="custom-topk" type="number" min="1" max="200" value="20" />
-                  </label>
-                  <label class="field field-inline">
-                    <span>Candidate Pool</span>
-                    <input id="custom-num-candidates" type="number" min="1" max="5000" value="100" />
-                  </label>
-                </div>
-                <button class="action-btn" type="submit">Build Shortlist</button>
-              </form>
-            </article>
-
-            <article class="panel results-panel">
-              <div class="section-head">
-                <h3>Top Candidates</h3>
-                <p id="results-meta" class="mini-muted">Build a shortlist to see ranked candidates.</p>
-              </div>
-
-              <div id="results" class="candidate-list empty-state">
-                <p>No shortlist yet.</p>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section id="page-profile" class="page hidden">
-          <div class="profile-layout">
-            <article class="panel">
-              <div class="section-head">
-                <h3>My Profile</h3>
-              </div>
-              <div class="profile-grid">
-                <p><b>Name:</b> <span id="profile-user-name">-</span></p>
-                <p><b>Email:</b> <span id="profile-user-email">-</span></p>
-                <p><b>Role:</b> <span id="profile-user-role">-</span></p>
-              </div>
-            </article>
-
-            <article class="panel">
-              <div class="section-head inline-actions">
-                <h3>Vacancies I Added</h3>
-                <button id="vacancies-refresh" class="chip-btn" type="button">Refresh</button>
-              </div>
-              <div id="vacancy-list" class="list-shell">
-                <p class="mini-muted">No vacancies yet.</p>
-              </div>
-            </article>
-
-            <article class="panel">
-              <div class="section-head inline-actions">
-                <h3>Shortlist History</h3>
-                <button id="history-refresh" class="chip-btn" type="button">Refresh</button>
-              </div>
-              <div id="history-list" class="list-shell">
-                <p class="mini-muted">No shortlist history yet.</p>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section id="page-insights" class="page hidden">
-          <article class="panel insights-panel">
-            <div class="section-head">
-              <h3>How to Read Insights</h3>
-            </div>
-            <div class="insight-cards">
-              <article class="insight-card">
-                <h4>What this page answers</h4>
-                <p>
-                  It shows which factors most often move candidates up or down in ranking across validation data.
-                </p>
-              </article>
-              <article class="insight-card">
-                <h4>How to interpret bars</h4>
-                <p>
-                  Larger mean |SHAP| means stronger influence. It is not "good" or "bad" alone, it means importance.
-                </p>
-              </article>
-              <article class="insight-card">
-                <h4>HR usage guideline</h4>
-                <p>
-                  Use SHAP as transparency support, but make final hiring decisions with human review and interview evidence.
-                </p>
-              </article>
-            </div>
-
-            <div class="section-head">
-              <h3>Top Ranking Factors</h3>
-              <p id="global-explainer-meta" class="mini-muted">Loading SHAP summary...</p>
-            </div>
-
-            <div id="global-shap-list" class="global-shap-list"></div>
-
-            <details class="feature-glossary">
-              <summary>Feature Glossary</summary>
-              <div id="feature-glossary-list" class="feature-glossary-list"></div>
-            </details>
-          </article>
-        </section>
-      </main>
-    </section>
-
-    <template id="candidate-template">
-      <article class="candidate-card">
-        <div class="candidate-top">
+        <form id="signin-form" class="stack-16 auth-form">
           <div>
-            <p class="rank-pill"></p>
-            <h3 class="resume-id"></h3>
+            <label class="form-label" for="signin-email">email</label>
+            <input class="field" id="signin-email" type="email" placeholder="hr@company.com" required />
           </div>
-          <button class="view-resume-btn" type="button">View Resume</button>
-        </div>
-
-        <div class="score-grid">
-          <div class="score-chip main">
-            <span>Overall Match Score</span>
-            <b class="score-fused">-</b>
+          <div>
+            <label class="form-label" for="signin-password">password</label>
+            <input class="field" id="signin-password" type="password" placeholder="••••••••" required />
           </div>
-        </div>
+          <button class="btn btn-primary btn-block" type="submit">→ sign in</button>
+        </form>
 
-        <p class="candidate-summary"></p>
+        <form id="signup-form" class="stack-16 auth-form hidden">
+          <div>
+            <label class="form-label" for="signup-fullname">full name</label>
+            <input class="field" id="signup-fullname" type="text" placeholder="Your Name" required />
+          </div>
+          <div>
+            <label class="form-label" for="signup-email">email</label>
+            <input class="field" id="signup-email" type="email" placeholder="hr@company.com" required />
+          </div>
+          <div>
+            <label class="form-label" for="signup-password">password</label>
+            <input class="field" id="signup-password" type="password" placeholder="minimum 8 chars" required />
+          </div>
+          <button class="btn btn-primary btn-block" type="submit">→ create account</button>
+        </form>
 
-        <details class="candidate-more">
-          <summary>More details</summary>
-          <div class="details-grid"></div>
-        </details>
+        <p id="auth-status" class="mini-muted auth-note">use your HR credentials to continue.</p>
       </article>
-    </template>
+    </section>
 
+    <!-- ===== APP SHELL ===== -->
+    <div id="app-shell" class="app hidden">
+
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">selects.</div>
+          <div class="brand-sub">screening console · v1.0</div>
+        </div>
+
+        <div class="nav-section-label">Pipeline</div>
+        <nav class="nav">
+          <button id="page-shortlist-btn" type="button" class="nav-item is-active">
+            <span class="nav-glyph">[x]</span>
+            <span>Shortlist</span>
+          </button>
+          <button id="page-profile-btn" type="button" class="nav-item">
+            <span class="nav-glyph">[+]</span>
+            <span>My Profile</span>
+          </button>
+          <button id="page-insights-btn" type="button" class="nav-item">
+            <span class="nav-glyph">[+]</span>
+            <span>Insights</span>
+          </button>
+        </nav>
+
+        <div class="flow-scope">
+          <div class="flow-scope-label">Flow scope</div>
+          <div class="flow-scope-body">
+            vacancy → search<br />
+            → rank → shortlist
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <main class="main">
+
+        <!-- Status bar -->
+        <div class="statusbar">
+          <div class="status-cell">
+            <span class="status-dot"></span>
+            <span class="status-value">ready</span>
+          </div>
+          <div class="status-cell">
+            <span class="status-label">model:</span>
+            <span class="status-value">lgbm-ranker</span>
+          </div>
+          <div class="status-spacer"></div>
+          <div class="status-cell">
+            <span class="status-label">user:</span>
+            <span id="topbar-user-name" class="status-value">—</span>
+          </div>
+          <div class="theme-toggle">
+            <button class="toggle-opt" id="theme-light-btn" type="button">light</button>
+            <button class="toggle-opt is-active" id="theme-dark-btn" type="button">dark</button>
+          </div>
+          <button id="signout-btn" type="button" class="icon-btn">sign out</button>
+        </div>
+
+        <!-- Transient status message -->
+        <p id="app-status" class="app-msg"></p>
+
+        <!-- Page stack -->
+        <div class="page-stack">
+
+          <!-- ===== SHORTLIST PAGE ===== -->
+          <section id="page-shortlist" class="screen is-active">
+            <header class="screen-header">
+              <div>
+                <h1 class="screen-title">shortlist</h1>
+                <p class="screen-sub">search and rank candidates against a vacancy specification</p>
+              </div>
+            </header>
+            <hr class="screen-divider" />
+
+            <div class="shortlist-layout">
+
+              <!-- Control panel -->
+              <div class="panel">
+                <div class="panel-header">
+                  <h2 class="panel-title">vacancy</h2>
+                </div>
+                <div class="panel-tabs-wrap">
+                  <div class="tabs">
+                    <button id="mode-existing" class="tab is-active" type="button">pick from catalog</button>
+                    <button id="mode-custom" class="tab" type="button">new vacancy</button>
+                  </div>
+                </div>
+
+                <div class="panel-body">
+                  <!-- Existing vacancy form -->
+                  <form id="existing-form" class="stack-16">
+                    <div>
+                      <label class="form-label" for="job-search">vacancy (start typing — 2 296 jobs)</label>
+                      <input class="field" id="job-search" type="text" list="job-options"
+                             placeholder="e.g. Python Developer" autocomplete="off" required />
+                      <datalist id="job-options"></datalist>
+                    </div>
+                    <div class="row-2">
+                      <div>
+                        <label class="form-label" for="existing-topk">finalists to show</label>
+                        <input class="field" id="existing-topk" type="number" min="1" max="200" value="20" />
+                      </div>
+                      <div>
+                        <label class="form-label" for="existing-num-candidates">pool to evaluate</label>
+                        <input class="field" id="existing-num-candidates" type="number" min="1" max="5000" value="100" />
+                      </div>
+                    </div>
+                    <button class="btn btn-primary btn-block" type="submit">→ find candidates</button>
+                  </form>
+
+                  <!-- Custom vacancy form -->
+                  <form id="custom-form" class="stack-16 hidden">
+                    <div>
+                      <label class="form-label" for="vacancy-title">vacancy title</label>
+                      <input class="field" id="vacancy-title" type="text" placeholder="Senior Data Scientist" required />
+                    </div>
+                    <div>
+                      <label class="form-label" for="vacancy-description">vacancy description</label>
+                      <textarea class="field" id="vacancy-description" rows="5"
+                                placeholder="Paste vacancy text here..." required></textarea>
+                    </div>
+                    <div class="row-2">
+                      <div>
+                        <label class="form-label" for="vacancy-years">years required (opt.)</label>
+                        <input class="field" id="vacancy-years" type="number" min="0" max="60" step="0.5" placeholder="3" />
+                      </div>
+                      <div>
+                        <label class="form-label" for="vacancy-skills">skills csv (opt.)</label>
+                        <input class="field" id="vacancy-skills" type="text" placeholder="python, sql, spark" />
+                      </div>
+                    </div>
+                    <div class="row-2">
+                      <div>
+                        <label class="form-label" for="custom-topk">finalists to show</label>
+                        <input class="field" id="custom-topk" type="number" min="1" max="200" value="20" />
+                      </div>
+                      <div>
+                        <label class="form-label" for="custom-num-candidates">pool to evaluate</label>
+                        <input class="field" id="custom-num-candidates" type="number" min="1" max="5000" value="100" />
+                      </div>
+                    </div>
+                    <button class="btn btn-primary btn-block" type="submit">→ find candidates</button>
+                  </form>
+                </div>
+              </div>
+
+              <!-- Results panel -->
+              <div class="panel">
+                <div class="panel-header">
+                  <h2 class="panel-title">candidates</h2>
+                  <span id="results-meta" class="mono-mute">build a shortlist to see ranked candidates.</span>
+                </div>
+                <div id="results" class="panel-body flush">
+                  <p class="mono-mute results-hint">
+                    pick a vacancy on the left, then click <b>→ find candidates</b> to see the ranked shortlist.
+                  </p>
+                </div>
+              </div>
+
+            </div>
+          </section>
+
+          <!-- ===== PROFILE PAGE ===== -->
+          <section id="page-profile" class="screen">
+            <header class="screen-header">
+              <div>
+                <h1 class="screen-title">profile</h1>
+                <p class="screen-sub">account info, added vacancies, and shortlist run history</p>
+              </div>
+            </header>
+            <hr class="screen-divider" />
+
+            <div class="stack-24">
+              <!-- Account info -->
+              <div class="panel">
+                <div class="panel-header">
+                  <h2 class="panel-title">account</h2>
+                </div>
+                <div class="panel-body">
+                  <div class="kv-row">
+                    <span class="kv-key">name</span>
+                    <span class="kv-val" id="profile-user-name">—</span>
+                  </div>
+                  <div class="kv-row">
+                    <span class="kv-key">email</span>
+                    <span class="kv-val" id="profile-user-email">—</span>
+                  </div>
+                  <div class="kv-row">
+                    <span class="kv-key">role</span>
+                    <span class="kv-val" id="profile-user-role">—</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Vacancies -->
+              <div class="panel">
+                <div class="panel-header">
+                  <h2 class="panel-title">vacancies i added</h2>
+                  <button id="vacancies-refresh" class="btn btn-secondary btn-sm" type="button">refresh</button>
+                </div>
+                <div id="vacancy-list" class="panel-body flush">
+                  <p class="mono-mute panel-empty">no vacancies yet.</p>
+                </div>
+              </div>
+
+              <!-- History -->
+              <div class="panel">
+                <div class="panel-header">
+                  <h2 class="panel-title">shortlist history</h2>
+                  <button id="history-refresh" class="btn btn-secondary btn-sm" type="button">refresh</button>
+                </div>
+                <div id="history-list" class="panel-body flush">
+                  <p class="mono-mute panel-empty">no shortlist history yet.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== INSIGHTS PAGE ===== -->
+          <section id="page-insights" class="screen">
+            <header class="screen-header">
+              <div>
+                <h1 class="screen-title">insights</h1>
+                <p class="screen-sub">model ranking factors and SHAP feature importance</p>
+              </div>
+            </header>
+            <hr class="screen-divider" />
+
+            <div class="stack-24">
+              <!-- Explainer cards -->
+              <div class="insights-explainers">
+                <div class="panel">
+                  <div class="panel-header"><h2 class="panel-title">what this shows</h2></div>
+                  <div class="panel-body">
+                    <p class="insight-desc">
+                      Factors most responsible for moving candidates up or down in ranking across validation data.
+                    </p>
+                  </div>
+                </div>
+                <div class="panel">
+                  <div class="panel-header"><h2 class="panel-title">how to read bars</h2></div>
+                  <div class="panel-body">
+                    <p class="insight-desc">
+                      Larger mean |SHAP| = stronger influence. Not "good" or "bad" alone — it means importance.
+                    </p>
+                  </div>
+                </div>
+                <div class="panel">
+                  <div class="panel-header"><h2 class="panel-title">HR guideline</h2></div>
+                  <div class="panel-body">
+                    <p class="insight-desc">
+                      Use SHAP as transparency support. Make final decisions with human review and interview evidence.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SHAP factors -->
+              <div class="panel">
+                <div class="panel-header">
+                  <h2 class="panel-title">top ranking factors</h2>
+                  <span id="global-explainer-meta" class="mono-mute">loading SHAP summary...</span>
+                </div>
+                <div id="global-shap-list" class="panel-body"></div>
+              </div>
+
+              <!-- Feature glossary -->
+              <div class="panel">
+                <div class="panel-header">
+                  <h2 class="panel-title">feature glossary</h2>
+                </div>
+                <div id="feature-glossary-list" class="panel-body flush"></div>
+              </div>
+            </div>
+          </section>
+
+        </div><!-- end page-stack -->
+      </main>
+    </div><!-- end app-shell -->
+
+    <!-- ===== RESUME MODAL ===== -->
     <div id="resume-modal" class="resume-modal hidden">
       <div id="resume-modal-backdrop" class="resume-modal-backdrop"></div>
       <article class="resume-modal-card" role="dialog" aria-modal="true" aria-labelledby="resume-modal-title">
-        <header class="resume-modal-head">
-          <h3 id="resume-modal-title">Resume</h3>
-          <button id="resume-modal-close" type="button" class="chip-btn">Close</button>
-        </header>
-        <pre id="resume-modal-text" class="resume-modal-text"></pre>
+        <div class="panel-header">
+          <h3 id="resume-modal-title" class="panel-title">resume</h3>
+          <button id="resume-modal-close" type="button" class="btn btn-secondary btn-sm">close</button>
+        </div>
+        <div class="panel-body">
+          <pre id="resume-modal-text" class="resume-modal-text"></pre>
+        </div>
       </article>
     </div>
+
+    <!-- ===== CANDIDATE CARD TEMPLATE ===== -->
+    <template id="candidate-template">
+      <article class="cand-card">
+        <div class="row-between">
+          <div class="cand-rank-group">
+            <span class="badge rank-pill"></span>
+            <span class="resume-id muted"></span>
+          </div>
+          <div class="cand-score-group">
+            <span class="score-bar-ascii"></span>
+            <span class="badge score-fused"></span>
+          </div>
+        </div>
+
+        <p class="cand-summary-text candidate-summary"></p>
+
+        <div class="resume-snippet-box"></div>
+
+        <div class="cand-actions-row">
+          <button class="btn btn-ghost btn-sm view-resume-btn" type="button">view resume</button>
+          <details class="candidate-more cand-why-details">
+            <summary>why this rank?</summary>
+            <div class="details-grid"></div>
+          </details>
+        </div>
+      </article>
+    </template>
 
     <script src="/ui/app.js"></script>
   </body>

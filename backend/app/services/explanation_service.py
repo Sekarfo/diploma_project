@@ -8,27 +8,13 @@ from src.ml.config import FEATURE_COLUMNS
 
 
 FEATURE_META: dict[str, dict[str, Any]] = {
-    "ce_score": {
-        "label": "Cross-Encoder Semantic Score",
+    "ce_score_x_skill": {
+        "label": "Cross-Encoder x Skill Overlap",
         "description": (
-            "Transformer-based reranker score in [0, 1]. Reads job and resume text "
-            "jointly and captures contextual relevance beyond skill keywords."
+            "Dampened cross-encoder signal: CE relevance score weighted by skill overlap "
+            "ratio. CE is used offline as a teacher to generate training labels; this is "
+            "the single distilled signal exposed to the ranker."
         ),
-        "used_in_model": True,
-    },
-    "ce_score_x_emb": {
-        "label": "Cross-Encoder x Embedding",
-        "description": "Interaction of cross-encoder score with embedding cosine similarity.",
-        "used_in_model": True,
-    },
-    "ce_score_zscore_in_job": {
-        "label": "Cross-Encoder (Per-Job Z-Score)",
-        "description": "Cross-encoder score standardized within the candidate pool for this vacancy.",
-        "used_in_model": True,
-    },
-    "ce_score_rank_in_job": {
-        "label": "Cross-Encoder Rank in Job",
-        "description": "Position of candidate among retrieved hits by cross-encoder score, 1 = highest.",
         "used_in_model": True,
     },
     "embedding_cosine": {

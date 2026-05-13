@@ -142,6 +142,17 @@ class AuthService:
         except Exception as exc:
             raise DatabaseUnavailableError(f"Sign-in failed: {exc}") from exc
 
+        # Cleanup old expired sessions for this user (best-effort, non-blocking)
+        try:
+            with db_connection() as _conn:
+                with _conn.cursor() as _cur:
+                    _cur.execute(
+                        "DELETE FROM user_sessions WHERE user_id = %s AND expires_at < now() - INTERVAL '7 days'",
+                        (str(user_id),),
+                    )
+        except Exception as _exc:
+            pass  # non-critical; don't fail signin if cleanup fails
+
         session = self._create_session(
             user_id=str(user_id),
             user_agent=user_agent,

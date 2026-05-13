@@ -11,12 +11,11 @@ logger = logging.getLogger(__name__)
 
 
 class CrossEncoderService:
-    """Wraps a sentence-transformers CrossEncoder for (job_text, resume_text) reranking.
+    """Wraps a sentence-transformers CrossEncoder for runtime feature generation.
 
-    Loaded once per process (singleton through `get_cross_encoder_service()`). Used by
-    `FeatureBuilderService` to populate the `ce_score` ML feature at inference. Raw
-    logits are sigmoid-mapped to [0, 1] so the runtime distribution matches the
-    training-time `ce_score` column produced by data/generate_labels.py.
+    Used by `FeatureBuilderService` to populate the `ce_score` column on retrieved
+    candidates. The score is sigmoid-mapped to [0, 1] so the runtime distribution
+    matches the offline labels produced by `data/generate_labels.py`.
     """
 
     def __init__(self, model_name: str, max_length: int, device: str | None = None) -> None:
@@ -25,8 +24,7 @@ class CrossEncoderService:
             from sentence_transformers import CrossEncoder  # type: ignore
         except ImportError as exc:
             raise RuntimeError(
-                "Cross-encoder dependencies missing. Install torch + sentence-transformers "
-                "(see backend/requirements.txt)."
+                "Cross-encoder dependencies missing. Install torch + sentence-transformers."
             ) from exc
 
         if device is None:
