@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -48,6 +50,8 @@ class ShortlistService:
 
         results: list[dict] = []
         for _, row in jobs_df.iterrows():
+            if len(list(row.get("job_skills_norm", []) or [])) < 2:
+                continue
             description = str(row.get("job_description", ""))
             preview = description[:220].strip()
             if len(description) > 220:
@@ -94,6 +98,7 @@ class ShortlistService:
         index_name: str | None = None,
         retrieved_csv: Path | None = None,
         allow_elastic_score_fallback: bool = False,
+        progress_cb: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict:
         artifacts = self.artifact_service.get_artifacts()
         top_k_value, num_candidates_value = self._resolve_limits(top_k, num_candidates)
@@ -144,6 +149,7 @@ class ShortlistService:
             index_name=index_name,
             retrieved_csv=retrieved_csv,
             allow_elastic_score_fallback=allow_elastic_score_fallback,
+            progress_cb=progress_cb,
         )
         result["proxy_job_id"] = str(proxy_job_row["job_id"])
         return result
@@ -157,6 +163,7 @@ class ShortlistService:
         index_name: str | None = None,
         retrieved_csv: Path | None = None,
         allow_elastic_score_fallback: bool = False,
+        progress_cb: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict:
         artifacts = self.artifact_service.get_artifacts()
         job_row, job_idx = self._get_job_row(job_id=job_id, artifacts=artifacts)
@@ -172,6 +179,7 @@ class ShortlistService:
             index_name=index_name,
             retrieved_csv=retrieved_csv,
             allow_elastic_score_fallback=allow_elastic_score_fallback,
+            progress_cb=progress_cb,
         )
 
     def _run_shortlist_pipeline(
@@ -185,6 +193,7 @@ class ShortlistService:
         index_name: str | None,
         retrieved_csv: Path | None,
         allow_elastic_score_fallback: bool,
+        progress_cb: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict:
         logger.info(
             "Shortlist request start job_id=%s top_k=%s num_candidates=%s",
@@ -219,6 +228,13 @@ class ShortlistService:
             ann_num_candidates,
         )
 
+        def _emit(event: dict[str, Any]) -> None:
+            if progress_cb is not None:
+                progress_cb(event)
+
+        _emit({"type": "progress", "stage": "retrieval",
+               "message": "Searching candidate database…", "current": 0, "total": effective_pool_size})
+
         if retrieved_csv is not None:
             hits = self.retrieval_service.retrieve_hits_from_csv(retrieved_csv, top_k=effective_pool_size)
         else:
@@ -241,17 +257,26 @@ class ShortlistService:
             raise EmptyRetrievalError(f"No candidates retrieved for job_id={job_row.get('job_id', '')}")
         logger.info("Retrieved %s candidates from retrieval layer (before rerank truncation)", len(hits))
 
+        _emit({"type": "progress", "stage": "retrieval",
+               "message": f"Retrieved {len(hits)} candidates", "current": len(hits), "total": len(hits)})
+        _emit({"type": "progress", "stage": "cross_encoder",
+               "message": f"Cross-encoder scoring 0/{len(hits)}…", "current": 0, "total": len(hits)})
+
         features_df = self.feature_builder.build_features_for_hits(
             artifacts=artifacts,
             job_row=job_row,
             job_vector=query_vector,
             hits=hits,
             allow_elastic_score_fallback=allow_elastic_score_fallback,
+            progress_cb=progress_cb,
         )
         if features_df.empty:
             raise EmptyRetrievalError(
                 f"No usable candidates left after feature build for job_id={job_row.get('job_id', '')}"
             )
+
+        _emit({"type": "progress", "stage": "ranking",
+               "message": "Ranking candidates with LightGBM…", "current": 0, "total": len(features_df)})
 
         ranked_df = self.ranking_service.rank_candidates(
             candidates_df=features_df,

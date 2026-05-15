@@ -19,5 +19,10 @@ pyarrow>=15.0.0
 # Cross-encoder is invoked at inference to populate the `ce_score_x_skill` ML feature
 # (see backend/app/services/cross_encoder_service.py). Removing these deps will break ranking.
 torch>=2.2.0
-transformers>=4.40.0
-sentence-transformers>=2.7.0
+# Pin to the 4.x line: transformers 5.x removed/changed the processor loader path that
+# CrossEncoder uses for tokenizer-only repos like cross-encoder/ms-marco-MiniLM-L-12-v2,
+# and sentence-transformers 5.x routes through AutoProcessor which then fails.
+transformers>=4.40.0,<5.0.0
+sentence-transformers>=2.7.0,<5.0.0
+# LLM analysis (OpenRouter via OpenAI-compatible API)
+openai>=1.40.0

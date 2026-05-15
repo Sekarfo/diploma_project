@@ -65,6 +65,14 @@ class Settings:
     max_top_k: int
     max_num_candidates: int
 
+    openrouter_api_key: str | None
+    openrouter_base_url: str
+    ai_model: str
+    ai_max_tokens: int
+    ai_analysis_top_k: int
+    ai_app_url: str
+    ai_app_title: str
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
@@ -96,11 +104,11 @@ def get_settings() -> Settings:
             "CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-12-v2"
         ),
         cross_encoder_max_length=int(os.getenv("CROSS_ENCODER_MAX_LENGTH", "512")),
-        cross_encoder_batch_size=int(os.getenv("CROSS_ENCODER_BATCH_SIZE", "64")),
+        cross_encoder_batch_size=int(os.getenv("CROSS_ENCODER_BATCH_SIZE", "128")),
         cross_encoder_cascade_enabled=(
             os.getenv("CROSS_ENCODER_CASCADE_ENABLED", "true").strip().lower() in _TRUE_VALUES
         ),
-        cross_encoder_cascade_top_m=int(os.getenv("CROSS_ENCODER_CASCADE_TOP_M", "200")),
+        cross_encoder_cascade_top_m=int(os.getenv("CROSS_ENCODER_CASCADE_TOP_M", "150")),
         cross_encoder_cascade_default_score=float(
             os.getenv("CROSS_ENCODER_CASCADE_DEFAULT_SCORE", "0.0")
         ),
@@ -113,6 +121,19 @@ def get_settings() -> Settings:
         auth_password_pepper=os.getenv("AUTH_PASSWORD_PEPPER", ""),
         default_top_k=20,
         default_num_candidates=100,
-        max_top_k=200,
-        max_num_candidates=5000,
+        # Capped at 30 so the UI "Candidates to show" slider and the API
+        # constraint stay in sync. Raising this requires bumping the HTML
+        # input max in frontend/index.html as well.
+        max_top_k=30,
+        max_num_candidates=300,
+        openrouter_api_key=(
+            os.getenv("OPENROUTER_API_KEY")
+            or os.getenv("OpenRouter_API_KEY")  # tolerate the original casing in legacy .env files
+        ),
+        openrouter_base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+        ai_model=os.getenv("AI_MODEL", "meta-llama/llama-3.1-8b-instruct"),
+        ai_max_tokens=int(os.getenv("AI_MAX_TOKENS", "500")),
+        ai_analysis_top_k=int(os.getenv("AI_ANALYSIS_TOP_K", "3")),
+        ai_app_url=os.getenv("AI_APP_URL", "http://localhost:8000"),
+        ai_app_title=os.getenv("AI_APP_TITLE", "Diploma Recruitment MVP"),
     )

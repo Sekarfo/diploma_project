@@ -19,7 +19,7 @@
       <article class="auth-card">
         <div class="brand auth-brand-section">
           <div class="brand-mark">selects.</div>
-          <div class="brand-sub">AI-powered candidate ranking</div>
+          <div class="brand-sub">System-powered candidate ranking</div>
         </div>
         <hr />
 
@@ -77,6 +77,10 @@
             <span class="nav-glyph">[x]</span>
             <span>Find Candidates</span>
           </button>
+          <button id="page-kanban-btn" type="button" class="nav-item">
+            <span class="nav-glyph">[k]</span>
+            <span>Pipeline</span>
+          </button>
           <button id="page-profile-btn" type="button" class="nav-item">
             <span class="nav-glyph">[+]</span>
             <span>My Profile</span>
@@ -91,7 +95,7 @@
           <div class="flow-scope-label">How it works</div>
           <div class="flow-scope-body">
             1. Pick or describe a vacancy<br />
-            2. AI ranks all candidates<br />
+            2. System ranks all candidates<br />
             3. Review &amp; leave decisions
           </div>
         </div>
@@ -133,7 +137,7 @@
             <header class="screen-header">
               <div>
                 <h1 class="screen-title">Find Candidates</h1>
-                <p class="screen-sub">Select a vacancy — the AI will retrieve and rank the best matching candidates from the resume database</p>
+                <p class="screen-sub">Select a vacancy — the system will retrieve and rank the best matching candidates from the resume database</p>
               </div>
             </header>
             <hr class="screen-divider" />
@@ -164,14 +168,14 @@
                     <div class="row-2">
                       <div>
                         <label class="form-label" for="existing-topk">Candidates to show</label>
-                        <input class="field" id="existing-topk" type="number" min="1" max="200" value="20" />
+                        <input class="field" id="existing-topk" type="number" min="1" max="30" value="20" />
                       </div>
                       <div>
                         <label class="form-label" for="existing-num-candidates">
                           Search depth
-                          <span class="label-hint">(more = better)</span>
+                          <span class="label-hint">(max 300)</span>
                         </label>
-                        <input class="field" id="existing-num-candidates" type="number" min="1" max="5000" value="100" />
+                        <input class="field" id="existing-num-candidates" type="number" min="1" max="300" value="300" />
                       </div>
                     </div>
                     <button class="btn btn-primary btn-block" type="submit">→ Find Candidates</button>
@@ -214,14 +218,14 @@
                     <div class="row-2">
                       <div>
                         <label class="form-label" for="custom-topk">Candidates to show</label>
-                        <input class="field" id="custom-topk" type="number" min="1" max="200" value="20" />
+                        <input class="field" id="custom-topk" type="number" min="1" max="30" value="20" />
                       </div>
                       <div>
                         <label class="form-label" for="custom-num-candidates">
                           Search depth
-                          <span class="label-hint">(more = better)</span>
+                          <span class="label-hint">(max 300)</span>
                         </label>
-                        <input class="field" id="custom-num-candidates" type="number" min="1" max="5000" value="100" />
+                        <input class="field" id="custom-num-candidates" type="number" min="1" max="300" value="300" />
                       </div>
                     </div>
                     <button class="btn btn-primary btn-block" type="submit">→ Find Candidates</button>
@@ -235,9 +239,39 @@
                   <h2 class="panel-title">Ranked Candidates</h2>
                   <span id="results-meta" class="mono-mute"></span>
                 </div>
+
+                <!-- AI analysis toolbar — hidden until a run is available -->
+                <div id="ai-toolbar" class="ai-toolbar hidden">
+                  <button id="ai-explain-btn" class="btn btn-ai btn-sm" type="button">
+                    <span class="ai-btn-glyph">✦</span> Explain Top 3
+                  </button>
+                  <button id="ai-compare-btn" class="btn btn-ai btn-sm" type="button">
+                    <span class="ai-btn-glyph">⟳</span> Compare &amp; Recommend
+                  </button>
+                  <span id="ai-rate-msg" class="ai-rate-msg" aria-live="polite"></span>
+                </div>
+
+                <!-- AI output panels — one per mode, kept side by side so they don't overlap -->
+                <div id="ai-panels" class="ai-panels">
+                  <div id="ai-panel-explain" class="ai-panel hidden" data-mode="explain">
+                    <div class="ai-panel-header">
+                      <span class="ai-panel-title">Explain Top 3</span>
+                      <button class="btn btn-ghost btn-sm ai-panel-close" type="button" data-mode="explain">×</button>
+                    </div>
+                    <div class="ai-panel-body" data-role="body"></div>
+                  </div>
+                  <div id="ai-panel-compare" class="ai-panel hidden" data-mode="compare">
+                    <div class="ai-panel-header">
+                      <span class="ai-panel-title">Compare &amp; Recommend</span>
+                      <button class="btn btn-ghost btn-sm ai-panel-close" type="button" data-mode="compare">×</button>
+                    </div>
+                    <div class="ai-panel-body" data-role="body"></div>
+                  </div>
+                </div>
+
                 <div id="results" class="panel-body flush">
                   <p class="mono-mute results-hint">
-                    Choose a vacancy on the left and click <b>→ Find Candidates</b> to see the AI-ranked shortlist.
+                    Choose a vacancy on the left and click <b>→ Find Candidates</b> to see the System-ranked shortlist.
                   </p>
                 </div>
               </div>
@@ -312,49 +346,78 @@
             <hr class="screen-divider" />
 
             <div class="stack-24">
-              <!-- Explainer cards -->
-              <div class="insights-explainers">
-                <div class="panel">
-                  <div class="panel-header"><h2 class="panel-title">What is this?</h2></div>
-                  <div class="panel-body">
-                    <p class="insight-desc">
-                      This page shows which signals most influence candidate ranking — based on SHAP analysis of the trained AI model.
-                    </p>
-                  </div>
-                </div>
-                <div class="panel">
-                  <div class="panel-header"><h2 class="panel-title">How to read the bars</h2></div>
-                  <div class="panel-body">
-                    <p class="insight-desc">
-                      Longer bar = stronger influence on final rank. A high score doesn't mean "good fit" on its own — it means the signal is important.
-                    </p>
-                  </div>
-                </div>
-                <div class="panel">
-                  <div class="panel-header"><h2 class="panel-title">Important note</h2></div>
-                  <div class="panel-body">
-                    <p class="insight-desc">
-                      Use AI ranking as a first filter. Always review candidate resumes and conduct interviews before making hiring decisions.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- SHAP factors -->
+              <!-- SHAP factors — the only thing that actually matters here -->
               <div class="panel">
                 <div class="panel-header">
-                  <h2 class="panel-title">Top Ranking Factors</h2>
-                  <span id="global-explainer-meta" class="mono-mute">loading…</span>
+                  <h2 class="panel-title">What drives a candidate's score</h2>
+                </div>
+                <div class="panel-body insights-intro">
+                  <p class="insight-desc">
+                    The ranking model evaluates each candidate using the signals below.
+                    A longer bar means that signal has a stronger effect on the final
+                    score across the whole dataset. Use this as a sanity check for why
+                    the system ranks one candidate above another — final hiring
+                    decisions always require human review.
+                  </p>
                 </div>
                 <div id="global-shap-list" class="panel-body"></div>
               </div>
+            </div>
+          </section>
 
-              <!-- Feature glossary -->
-              <div class="panel">
-                <div class="panel-header">
-                  <h2 class="panel-title">Signal Reference</h2>
+          <!-- ===== KANBAN PAGE ===== -->
+          <section id="page-kanban" class="screen">
+            <header class="screen-header">
+              <div>
+                <h1 class="screen-title">Candidate Pipeline</h1>
+                <p class="screen-sub">Track candidates through your hiring process. Decisions made in shortlist sync here automatically.</p>
+              </div>
+              <button id="kanban-refresh" class="btn btn-secondary btn-sm" type="button">Refresh</button>
+            </header>
+            <hr class="screen-divider" />
+
+            <div id="kanban-board" class="kanban-board">
+              <div class="kanban-col" data-status="new">
+                <div class="kanban-col-header">
+                  <span class="kanban-col-title">New</span>
+                  <span class="kanban-col-count badge">0</span>
                 </div>
-                <div id="feature-glossary-list" class="panel-body flush"></div>
+                <div class="kanban-col-body" data-status="new"></div>
+              </div>
+              <div class="kanban-col" data-status="screened">
+                <div class="kanban-col-header">
+                  <span class="kanban-col-title">Screened</span>
+                  <span class="kanban-col-count badge">0</span>
+                </div>
+                <div class="kanban-col-body" data-status="screened"></div>
+              </div>
+              <div class="kanban-col" data-status="interview">
+                <div class="kanban-col-header">
+                  <span class="kanban-col-title">Interview</span>
+                  <span class="kanban-col-count badge">0</span>
+                </div>
+                <div class="kanban-col-body" data-status="interview"></div>
+              </div>
+              <div class="kanban-col" data-status="offer">
+                <div class="kanban-col-header">
+                  <span class="kanban-col-title">Offer</span>
+                  <span class="kanban-col-count badge">0</span>
+                </div>
+                <div class="kanban-col-body" data-status="offer"></div>
+              </div>
+              <div class="kanban-col" data-status="hired">
+                <div class="kanban-col-header">
+                  <span class="kanban-col-title">Hired</span>
+                  <span class="kanban-col-count badge">0</span>
+                </div>
+                <div class="kanban-col-body" data-status="hired"></div>
+              </div>
+              <div class="kanban-col" data-status="rejected">
+                <div class="kanban-col-header">
+                  <span class="kanban-col-title">Rejected</span>
+                  <span class="kanban-col-count badge">0</span>
+                </div>
+                <div class="kanban-col-body" data-status="rejected"></div>
               </div>
             </div>
           </section>
@@ -442,10 +505,23 @@
     <!-- ===== SEARCH LOADING OVERLAY ===== -->
     <div id="search-overlay" class="search-overlay hidden" aria-live="polite" role="status">
       <div class="search-overlay-box">
-        <div class="search-spinner"></div>
-        <div>
+        <div class="search-spinner" id="search-spinner"></div>
+        <div class="search-overlay-content">
           <p id="search-overlay-text" class="search-overlay-text">Searching candidates…</p>
-          <p class="search-overlay-sub">retrieval → rerank → ML scoring</p>
+          <div id="ws-progress-wrap" class="ws-progress-wrap hidden">
+            <div class="ws-stages">
+              <span id="ws-stage-retrieval"    class="ws-stage">retrieval</span>
+              <span class="ws-stage-sep">→</span>
+              <span id="ws-stage-cross_encoder" class="ws-stage">cross-encoder</span>
+              <span class="ws-stage-sep">→</span>
+              <span id="ws-stage-ranking"      class="ws-stage">ranking</span>
+            </div>
+            <div class="ws-progress-bar-track">
+              <div id="ws-progress-bar" class="ws-progress-bar ws-progress-bar--zero"></div>
+            </div>
+            <p id="ws-progress-msg" class="ws-progress-msg">Starting…</p>
+          </div>
+          <p id="search-overlay-sub-static" class="search-overlay-sub">retrieval → rerank → ML scoring</p>
         </div>
       </div>
     </div>

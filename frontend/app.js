@@ -14,6 +14,9 @@ const state = {
   feedbackByRank: {},       // { [final_rank]: decision } for current run
   noteByRank: {},           // { [final_rank]: note } for current run
   currentJobSkills: [],     // required skills of the vacancy in current results
+  kanbanEntries: [],        // cached kanban board entries
+  aiUsedByMode: { explain: false, compare: false },   // one-click guard per run
+  aiStreamsByMode: { explain: null, compare: null },  // in-flight AbortControllers
 };
 
 const authScreenEl = document.getElementById("auth-screen");
@@ -31,14 +34,16 @@ const topbarUserNameEl = document.getElementById("topbar-user-name");
 
 const pageButtons = {
   shortlist: document.getElementById("page-shortlist-btn"),
-  profile: document.getElementById("page-profile-btn"),
-  insights: document.getElementById("page-insights-btn"),
+  kanban:    document.getElementById("page-kanban-btn"),
+  profile:   document.getElementById("page-profile-btn"),
+  insights:  document.getElementById("page-insights-btn"),
 };
 
 const pageSections = {
   shortlist: document.getElementById("page-shortlist"),
-  profile: document.getElementById("page-profile"),
-  insights: document.getElementById("page-insights"),
+  kanban:    document.getElementById("page-kanban"),
+  profile:   document.getElementById("page-profile"),
+  insights:  document.getElementById("page-insights"),
 };
 
 const modeExistingBtn = document.getElementById("mode-existing");
@@ -57,6 +62,15 @@ const resultsMetaEl = document.getElementById("results-meta");
 const resultsEl = document.getElementById("results");
 const candidateTemplate = document.getElementById("candidate-template");
 
+const aiToolbarEl    = document.getElementById("ai-toolbar");
+const aiExplainBtn   = document.getElementById("ai-explain-btn");
+const aiCompareBtn   = document.getElementById("ai-compare-btn");
+const aiRateMsgEl    = document.getElementById("ai-rate-msg");
+const aiPanelsByMode = {
+  explain: document.getElementById("ai-panel-explain"),
+  compare: document.getElementById("ai-panel-compare"),
+};
+
 const profileUserNameEl = document.getElementById("profile-user-name");
 const profileUserEmailEl = document.getElementById("profile-user-email");
 const profileUserRoleEl = document.getElementById("profile-user-role");
@@ -65,12 +79,19 @@ const historyListEl = document.getElementById("history-list");
 const vacanciesRefreshBtn = document.getElementById("vacancies-refresh");
 const historyRefreshBtn = document.getElementById("history-refresh");
 
-const globalExplainerMetaEl = document.getElementById("global-explainer-meta");
 const globalShapListEl = document.getElementById("global-shap-list");
-const featureGlossaryListEl = document.getElementById("feature-glossary-list");
 
 const searchOverlayEl = document.getElementById("search-overlay");
 const searchOverlayTextEl = document.getElementById("search-overlay-text");
+const wsProgressWrapEl   = document.getElementById("ws-progress-wrap");
+const wsProgressBarEl    = document.getElementById("ws-progress-bar");
+const wsProgressMsgEl    = document.getElementById("ws-progress-msg");
+const wsSubStaticEl      = document.getElementById("search-overlay-sub-static");
+const wsStageEls = {
+  retrieval:    document.getElementById("ws-stage-retrieval"),
+  cross_encoder: document.getElementById("ws-stage-cross_encoder"),
+  ranking:      document.getElementById("ws-stage-ranking"),
+};
 
 const resumeModalEl = document.getElementById("resume-modal");
 const resumeModalTextEl = document.getElementById("resume-modal-text");
@@ -93,6 +114,87 @@ function showSearchOverlay(text = "Searching candidates…") {
 
 function hideSearchOverlay() {
   searchOverlayEl.classList.add("hidden");
+  wsProgressWrapEl.classList.add("hidden");
+  wsSubStaticEl.classList.remove("hidden");
+  Object.values(wsStageEls).forEach(el => el && el.classList.remove("ws-stage--active", "ws-stage--done"));
+  if (wsProgressBarEl) {
+    wsProgressBarEl.classList.add("ws-progress-bar--zero");
+    wsProgressBarEl.classList.remove("ws-progress-bar--full");
+    wsProgressBarEl.style.width = "";
+  }
+}
+
+function showWsProgress() {
+  wsProgressWrapEl.classList.remove("hidden");
+  wsSubStaticEl.classList.add("hidden");
+}
+
+function updateWsProgress(event) {
+  const { stage, message, current, total } = event;
+  if (wsProgressMsgEl) wsProgressMsgEl.textContent = message || "";
+
+  const stageOrder = ["retrieval", "cross_encoder", "ranking"];
+  const stageIdx = stageOrder.indexOf(stage);
+
+  stageOrder.forEach((s, i) => {
+    const el = wsStageEls[s];
+    if (!el) return;
+    if (i < stageIdx) {
+      el.classList.remove("ws-stage--active");
+      el.classList.add("ws-stage--done");
+    } else if (i === stageIdx) {
+      el.classList.add("ws-stage--active");
+      el.classList.remove("ws-stage--done");
+    } else {
+      el.classList.remove("ws-stage--active", "ws-stage--done");
+    }
+  });
+
+  if (wsProgressBarEl && total > 0) {
+    const pct = Math.round((current / total) * 100);
+    wsProgressBarEl.classList.remove("ws-progress-bar--zero");
+    wsProgressBarEl.style.width = `${pct}%`;
+  }
+}
+
+function wsShortlistRequest(params) {
+  return new Promise((resolve, reject) => {
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const url = `${proto}//${window.location.host}/ws/shortlist?token=${encodeURIComponent(state.authToken)}`;
+    const ws = new WebSocket(url);
+    let settled = false;
+
+    ws.onopen = () => {
+      showWsProgress();
+      ws.send(JSON.stringify(params));
+    };
+
+    ws.onmessage = (evt) => {
+      let msg;
+      try { msg = JSON.parse(evt.data); } catch { return; }
+
+      if (msg.type === "progress") {
+        updateWsProgress(msg);
+      } else if (msg.type === "done") {
+        if (!settled) { settled = true; resolve({ data: msg.result, runId: msg.run_id }); }
+        ws.close();
+      } else if (msg.type === "error") {
+        if (!settled) { settled = true; reject(new Error(msg.message || "Pipeline error")); }
+        ws.close();
+      }
+    };
+
+    ws.onerror = () => {
+      if (!settled) { settled = true; reject(new Error("WebSocket connection failed")); }
+    };
+
+    ws.onclose = (evt) => {
+      if (!settled) {
+        settled = true;
+        reject(new Error(evt.reason || "WebSocket closed unexpectedly"));
+      }
+    };
+  });
 }
 
 function escapeHtml(value) {
@@ -617,11 +719,19 @@ function makeResumeSnippet(text, maxLen = 260) {
 function renderCandidates(payload, runId = null) {
   const candidates = payload.candidates || [];
   resultsEl.innerHTML = "";
+  resetAiPanels();
 
   if (!candidates.length) {
     resultsEl.innerHTML =
       '<p class="mono-mute results-hint">No candidates matched this vacancy. Try a broader description or increase the candidate pool.</p>';
+    hideAiToolbar();
     return;
+  }
+
+  if (runId) {
+    showAiToolbar();
+  } else {
+    hideAiToolbar();
   }
 
   const fragment = document.createDocumentFragment();
@@ -770,6 +880,9 @@ async function loadHistoryRun(runId) {
 
     updateResultsMeta(mapped, "loaded from history");
     renderCandidates(mapped, runId);
+    // Restore stored AI analyses (explain / compare) for this run, if any.
+    // The backend embeds them in HistoryDetailResponse.ai_analyses keyed by mode.
+    applyStoredAnalyses(detail.ai_analyses);
     setPage("shortlist");
     setAppStatus("History shortlist loaded.", "ok");
   } catch (error) {
@@ -833,6 +946,12 @@ function renderVacancyList(vacancies) {
 
 function renderGlobalExplanation(payload) {
   const features = payload.top_features || [];
+  // Build a lookup so each top factor can carry a one-line "what this measures"
+  // sentence next to its bar — that's the actual useful part for HR users.
+  const glossaryByFeature = {};
+  (payload.feature_glossary || []).forEach((item) => {
+    glossaryByFeature[item.feature] = item.description || "";
+  });
 
   // Normalize SHAP values to 0–1 range for bar rendering
   const maxShap = Math.max(...features.map((f) => numOr(f.mean_abs_shap, 0)), 0.001);
@@ -845,40 +964,26 @@ function renderGlobalExplanation(payload) {
       const bar = "█".repeat(filled) + "─".repeat(32 - filled);
       const friendlyName = FACTOR_LABELS[feature.feature] || feature.label;
       const pct = Math.round(ratio * 100);
+      const description = glossaryByFeature[feature.feature] || "";
       return `
         <div class="shap-item">
           <span class="shap-rank">#${index + 1}</span>
           <div class="shap-content">
             <div class="shap-feature-name">${escapeHtml(friendlyName)}</div>
             <div class="shap-ascii-bar">${escapeHtml(bar)} ${pct}%</div>
+            ${description ? `<div class="shap-feature-desc">${escapeHtml(description)}</div>` : ""}
           </div>
         </div>
       `;
     })
     .join("");
 
-  globalShapListEl.innerHTML = rows || "<p class='mono-mute'>No SHAP data available yet.</p>";
-  globalExplainerMetaEl.textContent = `${payload.validation_rows ?? 0} candidates analyzed`;
-
-  const glossary = (payload.feature_glossary || [])
-    .filter((item) => item.used_in_model)
-    .map(
-      (item) => `
-      <div class="pipeline-row">
-        <div>
-          <div class="pipeline-name">${escapeHtml(FACTOR_LABELS[item.feature] || item.label)}</div>
-          <div class="pipeline-sub">${escapeHtml(item.description)}</div>
-        </div>
-      </div>`
-    )
-    .join("");
-
-  featureGlossaryListEl.innerHTML = glossary || "<p class='mono-mute panel-empty'>No glossary available.</p>";
+  globalShapListEl.innerHTML = rows || "<p class='mono-mute'>SHAP analysis is not available yet — train the ranker to generate it.</p>";
 }
 
 async function loadJobs() {
   const data = await apiGet("/jobs", { authRequired: true });
-  state.jobs = data.jobs || [];
+  state.jobs = (data.jobs || []).filter((job) => job.job_id !== "job_ext_00014");
   jobOptionsEl.innerHTML = "";
 
   state.jobs.forEach((job) => {
@@ -911,17 +1016,12 @@ async function loadHistory() {
 }
 
 async function loadGlobalExplanation() {
-  globalExplainerMetaEl.textContent = "loading SHAP summary...";
-  globalShapListEl.innerHTML = "<p class='mono-mute'>Loading...</p>";
-  featureGlossaryListEl.innerHTML = "";
-
+  globalShapListEl.innerHTML = "<p class='mono-mute'>Loading SHAP summary…</p>";
   try {
     const data = await apiGet("/stats/explanations/global", { authRequired: true });
     renderGlobalExplanation(data);
   } catch (error) {
-    globalExplainerMetaEl.textContent = "SHAP summary unavailable";
     globalShapListEl.innerHTML = "<p class='mono-mute'>SHAP artifacts are not available yet.</p>";
-    featureGlossaryListEl.innerHTML = "";
   }
 }
 
@@ -964,7 +1064,6 @@ existingForm.addEventListener("submit", async (event) => {
     const data = await apiPost("/shortlist", payload, { authRequired: true });
     state.currentRunId = data.run_id || null;
     state.feedbackByRank = {};
-    // Store job skills for matched/missing display in candidate cards
     const jobObj = state.jobs.find((j) => j.job_id === jobId);
     state.currentJobSkills = jobObj ? (jobObj.job_skills_norm || []) : [];
     updateResultsMeta(data);
@@ -1003,7 +1102,6 @@ customForm.addEventListener("submit", async (event) => {
     const data = await apiPost("/shortlist/vacancy", payload, { authRequired: true });
     state.currentRunId = data.run_id || null;
     state.feedbackByRank = {};
-    // For custom vacancies, use skills the user typed in the form
     state.currentJobSkills = parsedSkills;
     updateResultsMeta(data, "");
     renderCandidates(data, state.currentRunId);
@@ -1084,12 +1182,38 @@ vacanciesRefreshBtn.addEventListener("click", async () => {
   }
 });
 
-pageButtons.shortlist.addEventListener("click", () => setPage("shortlist"));
+function clearResults() {
+  resultsEl.innerHTML =
+    '<p class="mono-mute results-hint">Choose a vacancy on the left and click <b>→ Find Candidates</b> to see the System-ranked shortlist.</p>';
+  resultsMetaEl.textContent = "";
+  state.currentRunId = null;
+  state.feedbackByRank = {};
+  state.noteByRank = {};
+  state.currentJobSkills = [];
+  resetAiPanels();
+  hideAiToolbar();
+}
+
+pageButtons.shortlist.addEventListener("click", () => { clearResults(); setPage("shortlist"); });
+pageButtons.kanban.addEventListener("click", () => { setPage("kanban"); loadKanbanBoard(); });
 pageButtons.profile.addEventListener("click", () => setPage("profile"));
 pageButtons.insights.addEventListener("click", () => setPage("insights"));
 
 modeExistingBtn.addEventListener("click", () => setShortlistMode("existing"));
 modeCustomBtn.addEventListener("click", () => setShortlistMode("custom"));
+
+// Keep search depth >= candidates to show, capped at 300
+function clampDepth(topkId, depthId) {
+  const topk  = document.getElementById(topkId);
+  const depth = document.getElementById(depthId);
+  if (!topk || !depth) return;
+  topk.addEventListener("input", () => {
+    const v = Number(topk.value) || 1;
+    if (Number(depth.value) < v) depth.value = Math.min(v, 300);
+  });
+}
+clampDepth("existing-topk", "existing-num-candidates");
+clampDepth("custom-topk",   "custom-num-candidates");
 
 authModeSignInBtn.addEventListener("click", () => setAuthMode("signin"));
 authModeSignUpBtn.addEventListener("click", () => setAuthMode("signup"));
@@ -1123,5 +1247,354 @@ async function boot() {
     await loadAppData();
   }
 }
+
+// ── AI candidate analysis ────────────────────────────────────────────────────
+
+const AI_BUTTONS = { explain: aiExplainBtn, compare: aiCompareBtn };
+
+function showAiToolbar() {
+  aiToolbarEl.classList.remove("hidden");
+}
+
+function hideAiToolbar() {
+  aiToolbarEl.classList.add("hidden");
+  Object.keys(aiPanelsByMode).forEach(hideAiPanel);
+  if (aiRateMsgEl) aiRateMsgEl.textContent = "";
+}
+
+function getAiBodyEl(mode) {
+  const panel = aiPanelsByMode[mode];
+  return panel ? panel.querySelector('[data-role="body"]') : null;
+}
+
+function showAiPanel(mode) {
+  const panel = aiPanelsByMode[mode];
+  if (panel) panel.classList.remove("hidden");
+}
+
+function hideAiPanel(mode) {
+  const panel = aiPanelsByMode[mode];
+  if (!panel) return;
+  panel.classList.add("hidden");
+  const body = getAiBodyEl(mode);
+  if (body) body.innerHTML = "";
+}
+
+function setAiButtonState(mode, { disabled, label }) {
+  const btn = AI_BUTTONS[mode];
+  if (!btn) return;
+  btn.disabled = Boolean(disabled);
+  btn.classList.toggle("is-disabled", Boolean(disabled));
+  if (label != null) btn.title = label;
+}
+
+function resetAiPanels() {
+  Object.keys(aiPanelsByMode).forEach((mode) => {
+    hideAiPanel(mode);
+    setAiButtonState(mode, { disabled: false, label: "" });
+    if (state.aiStreamsByMode[mode]) {
+      state.aiStreamsByMode[mode].abort();
+      state.aiStreamsByMode[mode] = null;
+    }
+  });
+  state.aiUsedByMode = { explain: false, compare: false };
+  if (aiRateMsgEl) aiRateMsgEl.textContent = "";
+}
+
+// Render LLM output safely: HTML-escape first, then bold the verdict line.
+// We bold any line that starts with "Recommendation:" (with or without leading
+// markdown asterisks) so the user immediately sees the final call.
+function formatAiContent(rawText) {
+  const safe = escapeHtml(rawText || "");
+  return safe.replace(
+    /(?:^|\n)([ \t]*\*{0,2}\s*Recommendation:[^\n]*)/gi,
+    (match, line) => {
+      // Strip wrapping asterisks the model may have added.
+      const clean = line.replace(/^\s*\*+/, "").replace(/\*+\s*$/, "").trim();
+      const prefix = match.startsWith("\n") ? "\n" : "";
+      return `${prefix}<strong class="ai-verdict">${clean}</strong>`;
+    }
+  );
+}
+
+function renderAiBody(body, rawText) {
+  let out = body.querySelector(".ai-text-out");
+  if (!out) {
+    body.innerHTML = '<span class="ai-text-out"></span>';
+    out = body.querySelector(".ai-text-out");
+  }
+  out.innerHTML = formatAiContent(rawText);
+}
+
+function renderStoredAnalysis(mode, analysis) {
+  showAiPanel(mode);
+  const body = getAiBodyEl(mode);
+  if (!body) return;
+  body.innerHTML = `<span class="ai-text-out"></span>`;
+  renderAiBody(body, analysis.content || "");
+  state.aiUsedByMode[mode] = true;
+  setAiButtonState(mode, { disabled: true, label: "Already generated for this run — open the panel above." });
+}
+
+function applyStoredAnalyses(analysesByMode) {
+  if (!analysesByMode) return;
+  Object.entries(analysesByMode).forEach(([mode, payload]) => {
+    if (!aiPanelsByMode[mode] || !payload) return;
+    renderStoredAnalysis(mode, payload);
+  });
+}
+
+async function runAiAnalysis(mode) {
+  const runId = state.currentRunId;
+  if (!runId) {
+    setAppStatus("Run the shortlist first to enable AI analysis.", "error");
+    return;
+  }
+  if (state.aiUsedByMode[mode]) {
+    setAppStatus("AI analysis already generated for this shortlist. Open the panel to see it.", "");
+    return;
+  }
+  if (state.aiStreamsByMode[mode]) return;   // double-click guard while in flight
+
+  // Optimistically mark as used so a quick double-click can't fire twice
+  state.aiUsedByMode[mode] = true;
+  setAiButtonState(mode, { disabled: true, label: "Generating…" });
+
+  showAiPanel(mode);
+  const body = getAiBodyEl(mode);
+  body.innerHTML = '<span class="ai-thinking">Thinking</span><span class="ai-dots">…</span>';
+
+  const controller = new AbortController();
+  state.aiStreamsByMode[mode] = controller;
+
+  try {
+    const resp = await fetch(
+      `/shortlist/${encodeURIComponent(runId)}/ai-analysis?mode=${mode}`,
+      { headers: getAuthHeaders(), signal: controller.signal }
+    );
+
+    if (resp.status === 429) {
+      const err = await resp.json().catch(() => ({}));
+      const retryAfter = resp.headers.get("Retry-After");
+      body.innerHTML = `<span class="ai-error">${escapeHtml(err.detail || "Rate limit reached.")}</span>`;
+      if (aiRateMsgEl) {
+        aiRateMsgEl.textContent = `Rate limit: 5 AI requests / 3 minutes. Retry in ${retryAfter || "180"}s.`;
+      }
+      // Roll back the optimistic guard so the user can retry once the window passes
+      state.aiUsedByMode[mode] = false;
+      setAiButtonState(mode, { disabled: false, label: "" });
+      return;
+    }
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${resp.status}`);
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let textSoFar = "";
+    let started = false;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        let msg;
+        try { msg = JSON.parse(line.slice(6)); } catch { continue; }
+
+        if (msg.type === "text") {
+          if (!started) {
+            body.innerHTML = '<span class="ai-text-out"></span><span class="ai-cursor-blink">▋</span>';
+            started = true;
+          }
+          textSoFar += msg.text;
+          renderAiBody(body, textSoFar);
+          // Keep the blinking cursor at the end during streaming
+          if (!body.querySelector(".ai-cursor-blink")) {
+            body.insertAdjacentHTML("beforeend", '<span class="ai-cursor-blink">▋</span>');
+          }
+        } else if (msg.type === "replace") {
+          // Backend sends the canonical, normalized text after the stream
+          // closes (used to enforce the bolded verdict line for compare mode).
+          textSoFar = msg.text || textSoFar;
+          renderAiBody(body, textSoFar);
+        } else if (msg.type === "done") {
+          const cursor = body.querySelector(".ai-cursor-blink");
+          if (cursor) cursor.remove();
+          // Lock the button permanently for this run — backend has now stored
+          // the result and any further click would just replay the cached copy.
+          setAiButtonState(mode, { disabled: true, label: "Already generated for this run." });
+        } else if (msg.type === "error") {
+          body.innerHTML = `<span class="ai-error">Error: ${escapeHtml(msg.text)}</span>`;
+          state.aiUsedByMode[mode] = false;
+          setAiButtonState(mode, { disabled: false, label: "" });
+        }
+      }
+    }
+  } catch (err) {
+    if (err.name !== "AbortError") {
+      body.innerHTML = `<span class="ai-error">${escapeHtml(err.message || "AI analysis failed.")}</span>`;
+      state.aiUsedByMode[mode] = false;
+      setAiButtonState(mode, { disabled: false, label: "" });
+    }
+  } finally {
+    if (state.aiStreamsByMode[mode] === controller) {
+      state.aiStreamsByMode[mode] = null;
+    }
+  }
+}
+
+aiExplainBtn.addEventListener("click", () => runAiAnalysis("explain"));
+aiCompareBtn.addEventListener("click", () => runAiAnalysis("compare"));
+
+// Wire up the per-panel close buttons (×) — they just hide the panel; the
+// "one-click" guard is independent of visibility so closing doesn't unlock the
+// button. To see the answer again, the user re-runs and gets the cached copy.
+document.querySelectorAll(".ai-panel-close").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const mode = btn.dataset.mode;
+    if (!mode) return;
+    const stream = state.aiStreamsByMode[mode];
+    if (stream) { stream.abort(); state.aiStreamsByMode[mode] = null; }
+    hideAiPanel(mode);
+    // Reopening from history will re-render this panel via applyStoredAnalyses,
+    // and a fresh run resets via resetAiPanels(), so we keep the guard active.
+    if (state.aiUsedByMode[mode]) {
+      setAiButtonState(mode, { disabled: true, label: "Already generated for this run." });
+    }
+  });
+});
+
+// ── Kanban board ─────────────────────────────────────────────────────────────
+
+const KANBAN_STATUSES = ["new", "screened", "interview", "offer", "hired", "rejected"];
+
+async function loadKanbanBoard() {
+  try {
+    const data = await apiGet("/kanban", { authRequired: true });
+    state.kanbanEntries = data.entries || [];
+    renderKanbanBoard();
+  } catch (error) {
+    setAppStatus(error.message || "Failed to load pipeline.", "error");
+  }
+}
+
+function renderKanbanBoard() {
+  const entries = state.kanbanEntries;
+
+  KANBAN_STATUSES.forEach((status) => {
+    const colBody = document.querySelector(`.kanban-col-body[data-status="${status}"]`);
+    const countEl = document.querySelector(`.kanban-col[data-status="${status}"] .kanban-col-count`);
+    if (!colBody) return;
+
+    const filtered = entries.filter((e) => e.kanban_status === status);
+    if (countEl) countEl.textContent = filtered.length;
+
+    colBody.innerHTML = "";
+    filtered.forEach((entry) => {
+      const card = buildKanbanCard(entry);
+      colBody.appendChild(card);
+    });
+
+    // Drop zone events
+    colBody.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      colBody.classList.add("kanban-drop-over");
+    });
+    colBody.addEventListener("dragleave", () => colBody.classList.remove("kanban-drop-over"));
+    colBody.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      colBody.classList.remove("kanban-drop-over");
+      const entryId = e.dataTransfer.getData("text/plain");
+      if (!entryId) return;
+      await moveKanbanEntry(entryId, status);
+    });
+  });
+}
+
+function buildKanbanCard(entry) {
+  const card = document.createElement("article");
+  card.className = "kanban-card";
+  card.draggable = true;
+  card.dataset.id = entry.id;
+
+  const score = entry.score != null ? (entry.score * 100).toFixed(1) + "%" : "—";
+  const rank = entry.final_rank != null ? `#${entry.final_rank}` : "—";
+  const snap = entry.candidate_snapshot || {};
+  const skills = snap.skill_overlap_ratio != null
+    ? `skills ${(snap.skill_overlap_ratio * 100).toFixed(0)}%`
+    : "";
+
+  card.innerHTML = `
+    <div class="kanban-card-header">
+      <span class="kanban-card-rank">${escapeHtml(rank)}</span>
+      <span class="kanban-card-score">${escapeHtml(score)}</span>
+      <button class="kanban-card-remove" title="Remove" data-id="${escapeHtml(entry.id)}">×</button>
+    </div>
+    <p class="kanban-card-id">${escapeHtml(entry.resume_id)}</p>
+    <p class="kanban-card-job">${escapeHtml(entry.job_title || "—")}</p>
+    ${skills ? `<p class="kanban-card-meta">${escapeHtml(skills)}</p>` : ""}
+    ${entry.note ? `<p class="kanban-card-note">${escapeHtml(entry.note)}</p>` : ""}
+  `;
+
+  card.addEventListener("dragstart", (e) => {
+    e.dataTransfer.setData("text/plain", entry.id);
+    card.classList.add("kanban-card--dragging");
+  });
+  card.addEventListener("dragend", () => card.classList.remove("kanban-card--dragging"));
+
+  card.querySelector(".kanban-card-remove").addEventListener("click", async (e) => {
+    e.stopPropagation();
+    await removeKanbanEntry(entry.id);
+  });
+
+  return card;
+}
+
+async function moveKanbanEntry(entryId, newStatus) {
+  try {
+    await apiPatch(`/kanban/${encodeURIComponent(entryId)}/status`, { kanban_status: newStatus });
+    const entry = state.kanbanEntries.find((e) => e.id === entryId);
+    if (entry) entry.kanban_status = newStatus;
+    renderKanbanBoard();
+  } catch (error) {
+    setAppStatus(error.message || "Failed to move candidate.", "error");
+  }
+}
+
+async function removeKanbanEntry(entryId) {
+  try {
+    await apiDelete(`/kanban/${encodeURIComponent(entryId)}`);
+    state.kanbanEntries = state.kanbanEntries.filter((e) => e.id !== entryId);
+    renderKanbanBoard();
+  } catch (error) {
+    setAppStatus(error.message || "Failed to remove candidate.", "error");
+  }
+}
+
+async function apiPatch(path, payload) {
+  return apiRequest(path, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }, { authRequired: true });
+}
+
+async function apiDelete(path) {
+  return apiRequest(path, { method: "DELETE" }, { authRequired: true });
+}
+
+document.getElementById("kanban-refresh").addEventListener("click", async () => {
+  await loadKanbanBoard();
+  setAppStatus("Pipeline refreshed.", "ok");
+});
 
 boot();

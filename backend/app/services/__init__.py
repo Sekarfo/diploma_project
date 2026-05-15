@@ -9,6 +9,7 @@ from .db_service import ensure_postgres_schema
 from .elasticsearch_service import ElasticsearchRetrievalService
 from .explanation_service import ExplanationService
 from .fairness_service import FairnessService, get_fairness_service
+from .kanban_service import KanbanService, get_kanban_service
 from .feature_builder_service import FeatureBuilderService
 from .history_service import HistoryService, get_history_service
 from .model_explanation_service import ModelExplanationService, get_model_explanation_service
@@ -27,6 +28,8 @@ __all__ = [
     "ElasticsearchRetrievalService",
     "FairnessService",
     "get_fairness_service",
+    "KanbanService",
+    "get_kanban_service",
     "FeatureBuilderService",
     "HistoryService",
     "get_history_service",

@@ -78,3 +78,6 @@ logs/
 db.sqlite3
 
 frontend-updated(sample)/
+
+jobs_clean.csv.bak
+job_embeddings.npy.bak

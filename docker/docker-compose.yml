@@ -39,21 +39,20 @@ services:
     # On Linux add: extra_hosts: ["host.docker.internal:host-gateway"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # Pull all keys from the project-root .env (OPENROUTER_API_KEY, CE tuning, etc.).
+    # Values in `environment:` below override these where they need a container-specific value.
+    env_file:
+      - ../.env
     environment:
+      # Container-only overrides (must point at sibling services, not host).
       ELASTICSEARCH_URL: http://elasticsearch:9200
       ELASTICSEARCH_INDEX: ${ELASTICSEARCH_INDEX:-resumes_index}
       # Use the host machine's PostgreSQL (diploma database) so data
       # persists across container rebuilds and is shared with local dev.
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-0000}@host.docker.internal:5432/${POSTGRES_DB:-diploma}
-      DB_SCHEMA_AUTOCREATE: "false"
-      AUTH_PASSWORD_PEPPER: ${AUTH_PASSWORD_PEPPER:-change_me_to_a_long_random_secret}
-      AUTH_SESSION_TTL_MINUTES: ${AUTH_SESSION_TTL_MINUTES:-10080}
-      CROSS_ENCODER_MODEL: ${CROSS_ENCODER_MODEL:-cross-encoder/ms-marco-MiniLM-L-12-v2}
-      CROSS_ENCODER_MAX_LENGTH: ${CROSS_ENCODER_MAX_LENGTH:-512}
-      CROSS_ENCODER_BATCH_SIZE: ${CROSS_ENCODER_BATCH_SIZE:-64}
-      CROSS_ENCODER_CASCADE_ENABLED: ${CROSS_ENCODER_CASCADE_ENABLED:-true}
-      CROSS_ENCODER_CASCADE_TOP_M: ${CROSS_ENCODER_CASCADE_TOP_M:-200}
-      CROSS_ENCODER_CASCADE_DEFAULT_SCORE: ${CROSS_ENCODER_CASCADE_DEFAULT_SCORE:-0.0}
+      # Run schema migrations on startup — needed to create kanban_entries and ai_analyses
+      # tables on fresh DBs. The statements are all IF NOT EXISTS, so it's idempotent.
+      DB_SCHEMA_AUTOCREATE: "true"
       PYTHONPATH: /app
     ports:
       - "8000:8000"

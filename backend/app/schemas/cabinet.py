@@ -49,6 +49,9 @@ class HistoryDetailResponse(BaseModel):
     error_message: str | None = None
     request_payload: dict = Field(default_factory=dict)
     candidates: list[HistoryCandidate] = Field(default_factory=list)
+    # Stored LLM analyses for this run, keyed by mode ('explain' / 'compare').
+    # Empty dict if the user never ran AI analysis on this shortlist.
+    ai_analyses: dict = Field(default_factory=dict)
 
 
 class VacancySummary(BaseModel):

@@ -174,6 +174,39 @@ _SCHEMA_STATEMENTS = [
     "CREATE INDEX IF NOT EXISTS idx_feedback_run ON recruiter_feedback(run_id)",
     # Fix #5: partial index on active sessions token hash — avoids full table scan on every auth request
     "CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON user_sessions(refresh_token_hash) WHERE revoked_at IS NULL",
+    """
+    CREATE TABLE IF NOT EXISTS kanban_entries (
+        id UUID PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        run_id UUID REFERENCES shortlist_runs(id) ON DELETE SET NULL,
+        resume_id TEXT NOT NULL,
+        job_title TEXT NOT NULL DEFAULT '',
+        final_rank INTEGER,
+        score DOUBLE PRECISION,
+        kanban_status TEXT NOT NULL DEFAULT 'new'
+            CHECK (kanban_status IN ('new', 'screened', 'interview', 'offer', 'hired', 'rejected')),
+        note TEXT,
+        candidate_snapshot JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        UNIQUE (user_id, run_id, resume_id)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_kanban_user_status ON kanban_entries(user_id, kanban_status)",
+    """
+    CREATE TABLE IF NOT EXISTS ai_analyses (
+        id UUID PRIMARY KEY,
+        run_id UUID NOT NULL REFERENCES shortlist_runs(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        mode TEXT NOT NULL CHECK (mode IN ('explain', 'compare')),
+        model TEXT NOT NULL,
+        content TEXT NOT NULL,
+        tokens_estimate INTEGER,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        UNIQUE (run_id, mode)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_ai_analyses_user_created ON ai_analyses(user_id, created_at DESC)",
 ]
 
 _MIGRATION_STATEMENTS = [
@@ -205,6 +238,42 @@ _MIGRATION_STATEMENTS = [
     "ALTER TABLE vacancies ADD COLUMN IF NOT EXISTS parser_payload JSONB",
     # Fix #5: add token index on existing DBs (idempotent via IF NOT EXISTS)
     "CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON user_sessions(refresh_token_hash) WHERE revoked_at IS NULL",
+    # Kanban pipeline table
+    """
+    CREATE TABLE IF NOT EXISTS kanban_entries (
+        id UUID PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        run_id UUID REFERENCES shortlist_runs(id) ON DELETE SET NULL,
+        resume_id TEXT NOT NULL,
+        job_title TEXT NOT NULL DEFAULT '',
+        final_rank INTEGER,
+        score DOUBLE PRECISION,
+        kanban_status TEXT NOT NULL DEFAULT 'new'
+            CHECK (kanban_status IN ('new', 'screened', 'interview', 'offer', 'hired', 'rejected')),
+        note TEXT,
+        candidate_snapshot JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        UNIQUE (user_id, run_id, resume_id)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_kanban_user_status ON kanban_entries(user_id, kanban_status)",
+    # AI analyses cache — one persisted result per (run_id, mode), used both as
+    # a one-click guard and as history-replay content on the cabinet detail page.
+    """
+    CREATE TABLE IF NOT EXISTS ai_analyses (
+        id UUID PRIMARY KEY,
+        run_id UUID NOT NULL REFERENCES shortlist_runs(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        mode TEXT NOT NULL CHECK (mode IN ('explain', 'compare')),
+        model TEXT NOT NULL,
+        content TEXT NOT NULL,
+        tokens_estimate INTEGER,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        UNIQUE (run_id, mode)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_ai_analyses_user_created ON ai_analyses(user_id, created_at DESC)",
 ]
 
 

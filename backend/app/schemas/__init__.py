@@ -41,8 +41,18 @@ from .stats import (
     RuntimeStatsResponse,
     StatsResponse,
 )
+from .kanban import (
+    KanbanBoardResponse,
+    KanbanEntry,
+    KanbanStatusResponse,
+    KanbanStatusUpdate,
+)
 
 __all__ = [
+    "KanbanBoardResponse",
+    "KanbanEntry",
+    "KanbanStatusResponse",
+    "KanbanStatusUpdate",
     "SignUpRequest",
     "SignInRequest",
     "AuthUser",

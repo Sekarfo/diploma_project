@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from functools import lru_cache
+from typing import Any
 
 import numpy as np
 
@@ -47,17 +49,31 @@ class CrossEncoderService:
     def model_name(self) -> str:
         return self._model_name
 
-    def score_pairs(self, pairs: list[tuple[str, str]], batch_size: int = 64) -> np.ndarray:
+    def score_pairs(
+        self,
+        pairs: list[tuple[str, str]],
+        batch_size: int = 64,
+        progress_cb: Callable[[int, int], Any] | None = None,
+    ) -> np.ndarray:
         if not pairs:
             return np.zeros(0, dtype=np.float32)
 
-        raw = self._model.predict(
-            [[job_text, resume_text] for job_text, resume_text in pairs],
-            batch_size=batch_size,
-            show_progress_bar=False,
-            convert_to_numpy=True,
-        )
-        raw_arr = np.asarray(raw, dtype=np.float64)
+        total = len(pairs)
+        all_scores: list[np.ndarray] = []
+
+        for start in range(0, total, batch_size):
+            batch = [[j, r] for j, r in pairs[start: start + batch_size]]
+            raw_batch = self._model.predict(
+                batch,
+                batch_size=batch_size,
+                show_progress_bar=False,
+                convert_to_numpy=True,
+            )
+            all_scores.append(np.asarray(raw_batch, dtype=np.float64))
+            if progress_cb is not None:
+                progress_cb(min(start + batch_size, total), total)
+
+        raw_arr = np.concatenate(all_scores)
 
         if raw_arr.min() < -0.01 or raw_arr.max() > 1.01:
             clipped = np.clip(raw_arr, -50.0, 50.0)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
@@ -38,6 +39,7 @@ class FeatureBuilderService:
         job_vector: np.ndarray,
         hits: list[dict[str, Any]],
         allow_elastic_score_fallback: bool = False,
+        progress_cb: Callable[[dict], None] | None = None,
     ) -> pd.DataFrame:
         rows: list[dict[str, Any]] = []
         missing_resume_ids: list[str] = []
@@ -130,7 +132,7 @@ class FeatureBuilderService:
             return pd.DataFrame(rows)
 
         base_df = pd.DataFrame(rows)
-        base_df = self._attach_cross_encoder_scores(base_df, job_row=job_row)
+        base_df = self._attach_cross_encoder_scores(base_df, job_row=job_row, progress_cb=progress_cb)
         engineered_df = engineer_features(base_df)
         return engineered_df
 
@@ -139,6 +141,7 @@ class FeatureBuilderService:
         df: pd.DataFrame,
         *,
         job_row: pd.Series,
+        progress_cb: Callable[[dict], None] | None = None,
     ) -> pd.DataFrame:
         if df.empty:
             df["ce_score"] = []
@@ -166,6 +169,12 @@ class FeatureBuilderService:
         # The unscored tail is dominated by candidates that wouldn't reach top-K anyway,
         # so quality on the final top-K is unaffected while CE inference drops ~5x.
         n_total = len(df)
+        def _ce_progress(done: int, total: int) -> None:
+            if progress_cb is not None:
+                progress_cb({"type": "progress", "stage": "cross_encoder",
+                             "message": f"Cross-encoder scoring {done}/{total}…",
+                             "current": done, "total": total})
+
         if settings.cross_encoder_cascade_enabled and n_total > settings.cross_encoder_cascade_top_m:
             cascade_default = float(settings.cross_encoder_cascade_default_score)
             df["ce_score"] = cascade_default
@@ -180,7 +189,11 @@ class FeatureBuilderService:
                 (job_text, str(text or "")) for text in sub_df["resume_text"].tolist()
             ]
             try:
-                scores = service.score_pairs(pairs, batch_size=settings.cross_encoder_batch_size)
+                scores = service.score_pairs(
+                    pairs,
+                    batch_size=settings.cross_encoder_batch_size,
+                    progress_cb=_ce_progress,
+                )
             except Exception as exc:
                 logger.warning("Cross-encoder scoring failed, falling back to ce_score=0.5: %s", exc)
                 df["ce_score"] = 0.5
@@ -195,7 +208,11 @@ class FeatureBuilderService:
 
         pairs = [(job_text, str(text or "")) for text in df["resume_text"].tolist()]
         try:
-            scores = service.score_pairs(pairs, batch_size=settings.cross_encoder_batch_size)
+            scores = service.score_pairs(
+                pairs,
+                batch_size=settings.cross_encoder_batch_size,
+                progress_cb=_ce_progress,
+            )
         except Exception as exc:
             logger.warning("Cross-encoder scoring failed, falling back to ce_score=0.5: %s", exc)
             df["ce_score"] = 0.5

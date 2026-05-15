@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import time
 from functools import lru_cache
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, WebSocket, WebSocketDisconnect, status
+from fastapi.responses import StreamingResponse
 
 from backend.app.schemas import (
     AuthMeResponse,
@@ -18,6 +22,9 @@ from backend.app.schemas import (
     HistoryListResponse,
     JobDetailResponse,
     JobsResponse,
+    KanbanBoardResponse,
+    KanbanStatusResponse,
+    KanbanStatusUpdate,
     ParsedVacancyResponse,
     RuntimeStatsResponse,
     ShortlistRequest,
@@ -36,11 +43,13 @@ from backend.app.services import (
     AuthService,
     FairnessService,
     HistoryService,
+    KanbanService,
     ShortlistService,
     get_auth_service,
     get_current_user,
     get_fairness_service,
     get_history_service,
+    get_kanban_service,
     get_model_explanation_service,
     get_runtime_metrics_service,
 )
@@ -117,8 +126,32 @@ def health() -> dict:
         logger.warning("Health check: artifacts unavailable — %s", exc)
         checks["artifacts"] = "unavailable"
 
+    # Cross-encoder device probe — does NOT trigger model load.
+    # Reports the actual loaded device if the CE singleton is already warm,
+    # otherwise reports what device the next load would pick.
+    ce_info: dict[str, Any] = {"loaded": False}
+    try:
+        import torch  # type: ignore
+        ce_info["cuda_available"] = bool(torch.cuda.is_available())
+        if ce_info["cuda_available"]:
+            ce_info["cuda_device_name"] = torch.cuda.get_device_name(0)
+    except Exception as exc:
+        logger.warning("Health check: torch probe failed — %s", exc)
+        ce_info["cuda_available"] = False
+
+    try:
+        from backend.app.services.cross_encoder_service import get_cross_encoder_service
+        cache_info = get_cross_encoder_service.cache_info()
+        if cache_info.currsize > 0:
+            svc = get_cross_encoder_service()
+            ce_info["loaded"] = True
+            ce_info["device"] = svc.device
+            ce_info["model"] = svc.model_name
+    except Exception as exc:
+        logger.warning("Health check: cross-encoder probe failed — %s", exc)
+
     overall = "ok" if all(v == "ok" for v in checks.values()) else "degraded"
-    return {"status": overall, **checks}
+    return {"status": overall, **checks, "cross_encoder": ce_info}
 
 
 @router.post("/auth/signup", response_model=AuthResponse)
@@ -549,4 +582,249 @@ async def parse_vacancy_file(
     except Exception as exc:
         logger.exception("POST /vacancies/parse failed user_id=%s: %s", current_user.user_id, exc)
         raise HTTPException(status_code=500, detail=f"File parsing failed: {exc}") from exc
+
+
+# ── Kanban pipeline ──────────────────────────────────────────────────────────
+
+@router.get("/kanban", response_model=KanbanBoardResponse)
+def get_kanban_board(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    kanban_service: KanbanService = Depends(get_kanban_service),
+) -> KanbanBoardResponse:
+    logger.info("GET /kanban user_id=%s", current_user.user_id)
+    try:
+        entries = kanban_service.list_board(user_id=current_user.user_id)
+        return KanbanBoardResponse(entries=entries)
+    except Exception as exc:
+        logger.exception("GET /kanban failed user_id=%s: %s", current_user.user_id, exc)
+        raise _map_error_to_http(exc) from exc
+
+
+@router.patch("/kanban/{entry_id}/status", response_model=KanbanStatusResponse)
+def update_kanban_status(
+    entry_id: str,
+    payload: KanbanStatusUpdate,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    kanban_service: KanbanService = Depends(get_kanban_service),
+) -> KanbanStatusResponse:
+    logger.info("PATCH /kanban/%s/status user_id=%s status=%s",
+                entry_id, current_user.user_id, payload.kanban_status)
+    try:
+        result = kanban_service.update_status(
+            user_id=current_user.user_id,
+            entry_id=entry_id,
+            kanban_status=payload.kanban_status,
+        )
+        return KanbanStatusResponse(**result)
+    except Exception as exc:
+        logger.exception("PATCH /kanban/%s/status failed: %s", entry_id, exc)
+        raise _map_error_to_http(exc) from exc
+
+
+@router.delete("/kanban/{entry_id}", status_code=204)
+def delete_kanban_entry(
+    entry_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    kanban_service: KanbanService = Depends(get_kanban_service),
+) -> None:
+    logger.info("DELETE /kanban/%s user_id=%s", entry_id, current_user.user_id)
+    try:
+        kanban_service.delete_entry(user_id=current_user.user_id, entry_id=entry_id)
+    except Exception as exc:
+        logger.exception("DELETE /kanban/%s failed: %s", entry_id, exc)
+        raise _map_error_to_http(exc) from exc
+
+
+# ── AI candidate analysis (SSE) ──────────────────────────────────────────────
+
+@router.get("/shortlist/{run_id}/ai-analysis")
+def ai_analysis(
+    run_id: str,
+    mode: str = Query(default="explain", pattern="^(explain|compare)$"),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    history_service: HistoryService = Depends(get_history_service),
+) -> StreamingResponse:
+    """Stream AI-generated candidate analysis as SSE.
+
+    mode=explain  — individual assessment for each of the top 3 candidates.
+    mode=compare  — head-to-head comparison with a single hiring recommendation.
+
+    Per-user rate limit: 5 requests / 3 minutes. Repeated calls with the same
+    (run_id, mode) replay the cached DB copy and do not count toward the limit.
+    """
+    from backend.app.services.ai_analysis_service import AIAnalysisService
+    from backend.app.services.ai_rate_limit import ai_analysis_limiter
+
+    logger.info(
+        "GET /shortlist/%s/ai-analysis mode=%s user_id=%s",
+        run_id, mode, current_user.user_id,
+    )
+
+    # If we already have a saved analysis, replay it from DB. This is free,
+    # not counted toward the rate limit, and gives the frontend a fast path
+    # for re-opening completed analyses.
+    cached = AIAnalysisService.get_cached_analysis(run_id=run_id, mode=mode)
+    if cached is None:
+        decision = ai_analysis_limiter.check(current_user.user_id)
+        if not decision.allowed:
+            retry = max(1, int(decision.retry_after_seconds))
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=(
+                    f"AI analysis rate limit reached (5 requests / 3 minutes). "
+                    f"Try again in {retry} seconds."
+                ),
+                headers={"Retry-After": str(retry)},
+            )
+
+    try:
+        run_detail = history_service.get_run_detail(
+            user_id=current_user.user_id,
+            run_id=run_id,
+        )
+    except Exception as exc:
+        raise _map_error_to_http(exc) from exc
+
+    svc = AIAnalysisService()
+    return StreamingResponse(
+        svc.stream_analysis(
+            mode=mode,
+            run_id=run_id,
+            user_id=current_user.user_id,
+            run_detail=run_detail,
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get("/shortlist/{run_id}/ai-analyses")
+def list_ai_analyses(
+    run_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    history_service: HistoryService = Depends(get_history_service),
+) -> dict[str, Any]:
+    """Return all stored AI analyses for a run, keyed by mode.
+
+    Used by the frontend to restore previously-generated explain/compare panels
+    when the user reopens a shortlist from history.
+    """
+    from backend.app.services.ai_analysis_service import AIAnalysisService
+
+    # Ownership check — get_run_detail raises HistoryNotFoundError if the run
+    # doesn't belong to this user, preventing cross-user analysis leaks.
+    try:
+        history_service.get_run_detail(user_id=current_user.user_id, run_id=run_id)
+    except Exception as exc:
+        raise _map_error_to_http(exc) from exc
+
+    return {"run_id": run_id, "analyses": AIAnalysisService.list_for_run(run_id=run_id)}
+
+
+# ── WebSocket shortlist with real-time progress ──────────────────────────────
+
+@router.websocket("/ws/shortlist")
+async def ws_shortlist(
+    websocket: WebSocket,
+    token: str = Query(...),
+) -> None:
+    await websocket.accept()
+    loop = asyncio.get_event_loop()
+    queue: asyncio.Queue[dict] = asyncio.Queue()
+
+    # Authenticate via token query param
+    try:
+        auth_svc = get_auth_service()
+        current_user = auth_svc.get_user_from_token(token)
+    except Exception as exc:
+        await websocket.send_json({"type": "error", "message": f"Unauthorized: {exc}"})
+        await websocket.close(code=4001)
+        return
+
+    # Receive request params
+    try:
+        params = await asyncio.wait_for(websocket.receive_json(), timeout=10.0)
+    except Exception:
+        await websocket.send_json({"type": "error", "message": "Expected JSON params."})
+        await websocket.close(code=4000)
+        return
+
+    def _progress_cb(event: dict) -> None:
+        asyncio.run_coroutine_threadsafe(queue.put(event), loop)
+
+    svc = get_shortlist_service()
+    history_service = get_history_service()
+    request_kind = params.get("type", "existing_job")
+
+    def _run_pipeline() -> dict:
+        if request_kind == "custom_vacancy":
+            return svc.shortlist_for_vacancy(
+                vacancy_title=str(params.get("vacancy_title", "")),
+                vacancy_description=str(params.get("vacancy_description", "")),
+                top_k=params.get("top_k"),
+                num_candidates=params.get("num_candidates"),
+                job_years_required=params.get("job_years_required"),
+                job_skills_norm=params.get("job_skills_norm"),
+                progress_cb=_progress_cb,
+            )
+        return svc.shortlist(
+            job_id=str(params.get("job_id", "")),
+            top_k=params.get("top_k"),
+            num_candidates=params.get("num_candidates"),
+            progress_cb=_progress_cb,
+        )
+
+    # Run blocking pipeline in thread pool
+    future = loop.run_in_executor(None, _run_pipeline)
+
+    # Stream progress events while pipeline runs
+    try:
+        while not future.done():
+            try:
+                event = await asyncio.wait_for(asyncio.shield(
+                    asyncio.ensure_future(queue.get())
+                ), timeout=0.1)
+                await websocket.send_json(event)
+            except asyncio.TimeoutError:
+                continue
+            except WebSocketDisconnect:
+                future.cancel()
+                return
+
+        # Drain remaining queued events
+        while not queue.empty():
+            await websocket.send_json(queue.get_nowait())
+
+        result = await future
+    except Exception as exc:
+        await websocket.send_json({"type": "error", "message": str(exc)})
+        await websocket.close()
+        return
+
+    # Persist to history (best-effort)
+    run_id: str | None = None
+    try:
+        latency_ms = 0
+        if request_kind == "custom_vacancy":
+            run_id = history_service.record_custom_vacancy_shortlist(
+                user_id=current_user.user_id,
+                request_payload=params,
+                result_payload=result,
+                latency_ms=latency_ms,
+            )
+        else:
+            run_id = history_service.record_existing_job_shortlist(
+                user_id=current_user.user_id,
+                request_payload=params,
+                result_payload=result,
+                latency_ms=latency_ms,
+            )
+    except Exception as hist_exc:
+        logger.warning("WS /ws/shortlist history persistence skipped: %s", hist_exc)
+
+    await websocket.send_json({"type": "done", "result": result, "run_id": run_id})
+    await websocket.close()
 

@@ -314,6 +314,15 @@ class HistoryService:
                 }
             )
 
+        # Best-effort fetch of stored LLM analyses for this run so the frontend
+        # can restore the explain/compare panels when reopening from history.
+        ai_analyses: dict[str, Any] = {}
+        try:
+            from backend.app.services.ai_analysis_service import AIAnalysisService
+            ai_analyses = AIAnalysisService.list_for_run(run_id=run_id)
+        except Exception:
+            ai_analyses = {}
+
         return {
             "run_id": str(db_run_id),
             "created_at": self._as_iso(created_at),
@@ -329,6 +338,7 @@ class HistoryService:
             "error_message": str(error_message) if error_message else None,
             "request_payload": self._parse_json_column(request_payload),
             "candidates": candidates,
+            "ai_analyses": ai_analyses,
         }
 
     def _record_run(
@@ -454,18 +464,27 @@ class HistoryService:
         try:
             with db_connection() as connection:
                 with connection.cursor() as cursor:
-                    # Verify the run belongs to this user
+                    # Verify the run belongs to this user and fetch job title
                     cursor.execute(
-                        "SELECT id FROM shortlist_runs WHERE id = %s AND user_id = %s",
+                        """
+                        SELECT r.id, COALESCE(v.title, r.existing_job_id, '') AS job_title
+                        FROM shortlist_runs r
+                        LEFT JOIN vacancies v ON v.id = r.vacancy_id
+                        WHERE r.id = %s AND r.user_id = %s
+                        """,
                         (run_id, user_id),
                     )
-                    if cursor.fetchone() is None:
+                    run_row = cursor.fetchone()
+                    if run_row is None:
                         raise HistoryNotFoundError("Shortlist run not found.")
+                    job_title_for_kanban = str(run_row[1] or "")
 
                     # Look up the internal candidate id by rank
                     cursor.execute(
                         """
-                        SELECT id, resume_id FROM shortlist_candidates
+                        SELECT id, resume_id, final_fusion_score, model_score,
+                               feature_snapshot
+                        FROM shortlist_candidates
                         WHERE run_id = %s AND final_rank = %s
                         """,
                         (run_id, final_rank),
@@ -475,7 +494,7 @@ class HistoryService:
                         raise HistoryNotFoundError(
                             f"Candidate with rank {final_rank} not found in this run."
                         )
-                    candidate_id, resume_id = cand_row
+                    candidate_id, resume_id, fusion_score, model_score, feat_snap = cand_row
 
                     # Upsert: create or update feedback for (user_id, candidate_id)
                     cursor.execute(
@@ -509,6 +528,28 @@ class HistoryService:
             raise
         except Exception as exc:
             raise HistoryPersistenceError(f"Failed to persist feedback: {exc}") from exc
+
+        # Sync to kanban pipeline (best-effort — never fail the feedback call)
+        try:
+            from backend.app.services.kanban_service import get_kanban_service
+            snapshot: dict = {}
+            if feat_snap and isinstance(feat_snap, dict):
+                snapshot = {k: feat_snap[k] for k in
+                            ("skill_overlap_ratio", "resume_years_experience",
+                             "embedding_cosine", "title_overlap_ratio") if k in feat_snap}
+            get_kanban_service().upsert_from_feedback(
+                user_id=user_id,
+                run_id=run_id,
+                resume_id=str(resume_id),
+                decision=decision,
+                job_title=job_title_for_kanban,
+                final_rank=final_rank,
+                score=float(fusion_score) if fusion_score is not None else None,
+                note=note,
+                candidate_snapshot=snapshot,
+            )
+        except Exception:
+            pass  # kanban sync is non-blocking
 
         return {
             "feedback_id": str(actual_id),
