@@ -846,7 +846,7 @@ function mapHistoryDetailToCandidates(detail) {
     return {
       final_rank: candidate.final_rank,
       resume_id: candidate.resume_id,
-      resume_text: "",
+      resume_text: candidate.resume_text || "",
       final_fusion_score: candidate.final_fusion_score ?? 0,
       retrieval_rank: candidate.retrieval_rank ?? 0,
       retrieval_score_norm: numOr(feature.retrieval_score_norm, 0),

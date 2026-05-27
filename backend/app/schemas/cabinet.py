@@ -27,6 +27,7 @@ class HistoryListResponse(BaseModel):
 class HistoryCandidate(BaseModel):
     final_rank: int
     resume_id: str
+    resume_text: str = ""
     final_fusion_score: float
     model_score: float
     retrieval_rank: int

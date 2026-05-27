@@ -14,6 +14,7 @@ from backend.app.services.errors import HistoryNotFoundError, HistoryPersistence
 class HistoryService:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
+        self._artifact_service: Any = None
 
     def record_existing_job_shortlist(
         self,
@@ -291,6 +292,10 @@ class HistoryService:
             vacancy_description,
         ) = run_row
 
+        resume_text_by_id = self._resume_text_lookup(
+            [str(row[1]) for row in candidate_rows]
+        )
+
         candidates: list[dict[str, Any]] = []
         for candidate_row in candidate_rows:
             (
@@ -302,10 +307,12 @@ class HistoryService:
                 feature_snapshot,
                 explanation_json,
             ) = candidate_row
+            resume_id_str = str(resume_id)
             candidates.append(
                 {
                     "final_rank": int(final_rank),
-                    "resume_id": str(resume_id),
+                    "resume_id": resume_id_str,
+                    "resume_text": resume_text_by_id.get(resume_id_str, ""),
                     "final_fusion_score": float(final_fusion_score or 0.0),
                     "model_score": float(model_score or 0.0),
                     "retrieval_rank": int(retrieval_rank or 0),
@@ -638,6 +645,30 @@ class HistoryService:
             raise HistoryPersistenceError(f"Failed to delete feedback: {exc}") from exc
 
     # ── Helpers ───────────────────────────────────────────────────────────────
+
+    def _resume_text_lookup(self, resume_ids: list[str]) -> dict[str, str]:
+        """Hydrate resume_text by resume_id from the in-memory artifacts.
+
+        History rows store only resume_id, so the text must be joined at read time.
+        Failures are swallowed: candidates simply get an empty text instead of breaking
+        the history detail response.
+        """
+        if not resume_ids:
+            return {}
+        try:
+            if self._artifact_service is None:
+                from backend.app.services.artifact_service import ArtifactService
+                self._artifact_service = ArtifactService(self.settings)
+            artifacts = self._artifact_service.get_artifacts()
+            df = artifacts.resumes_df
+            wanted = set(resume_ids)
+            subset = df[df["resume_id"].astype(str).isin(wanted)]
+            return {
+                str(row["resume_id"]): str(row.get("resume_text", "") or "")
+                for _, row in subset.iterrows()
+            }
+        except Exception:
+            return {}
 
     @staticmethod
     def _parse_json_column(value: Any) -> Any:
