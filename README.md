@@ -31,7 +31,7 @@ requirements-ml.txt            # Heavy ML deps (torch, sentence-transformers) fo
 
 - `data/Clear/jobs_clean.csv` — 2 296 vacancies.
 - `data/Clear/resumes_clean.csv` — 18 174 resumes (`person_id` → `resume_id`).
-- `data/pair_features_labeled.csv` — 114 800 labeled (job, resume) pairs. Labels are 5 absolute buckets of `ce_score` (see `data/generate_labels.py`).
+- `data/pair_features_labeled.csv` — **20 400 trainable (job, resume) pairs** (408 vacancies × 50 candidates). Labels are 5 absolute buckets of `ce_score`. Only vacancies that have at least one strong positive (label ≥ 3) **and** one negative (label ≤ 1) are retained — LambdaRank requires label variation within each group. Pre-filter pool = 114 800 pairs across all 2 296 vacancies; 1 888 vacancies were dropped as degenerate (see `data/generate_labels.py`).
 
 ---
 
@@ -135,4 +135,4 @@ LambdaRank `label_gain = [0, 1, 2, 4, 8]` to match the 5-bucket labels.
 
 ## Methodology Note (for thesis)
 
-Cross-encoder is used as a **teacher** in a knowledge-distillation setup: it labels (job, resume) pairs offline and reappears at inference only to populate one dampened feature (`ce_score_x_skill = ce_score × skill_overlap_ratio`). Multiplying by `skill_overlap_ratio` (which varies widely within a retrieved pool 0..1) scrambles the CE ordering enough to drop solo NDCG@10 from 1.0 (raw `ce_score`) to ~0.78 — turning a trivial label-reconstruction feature into a controlled hint. The LightGBM combiner is then forced to use the other 29 structured features to refine ranking, ending up in the 0.82–0.88 NDCG@10 zone with realistic interpretable SHAP contributions.
+Cross-encoder is used as a **teacher** in a knowledge-distillation setup: it labels (job, resume) pairs offline and reappears at inference only to populate one dampened feature (`ce_score_x_skill = ce_score × skill_overlap_ratio`). Multiplying by `skill_overlap_ratio` (which varies widely within a retrieved pool 0..1) scrambles the CE ordering enough to drop solo NDCG@10 from 1.0 (raw `ce_score`) to ~0.78 — turning a trivial label-reconstruction feature into a controlled hint. The LightGBM combiner is then forced to use the other 29 structured features to refine ranking, ending up in the 0.89–0.91 NDCG@10 zone with realistic interpretable SHAP contributions (valid 0.909, test 0.894 on the current 408-vacancy dataset).
