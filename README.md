@@ -1,4 +1,4 @@
-# Job-Resume Shortlisting MVP
+# Shortlisting resumes for selected jobs | MVP
 
 Three-stage candidate matching pipeline with an HR cabinet, fairness audit, recruiter feedback loop, and LLM candidate analysis.
 
