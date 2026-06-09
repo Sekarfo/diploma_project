@@ -44,7 +44,7 @@ requirements-ml.txt            # Heavy ML deps (torch, sentence-transformers) fo
 - `data/Clear/resumes_clean.csv` — 18 174 resumes (`person_id` → `resume_id`).
 - `data/pair_features_labeled.csv` — **20 400 trainable (job, resume) pairs** (408 vacancies × 50 candidates). Labels are 5 absolute buckets of `ce_score`. Only vacancies that have at least one strong positive (label ≥ 3) **and** one negative (label ≤ 1) are retained — LambdaRank requires label variation within each group. Pre-filter pool = 114 800 pairs across all 2 296 vacancies; 1 888 vacancies were dropped as degenerate (see `data/generate_labels.py`).
 
-The 408 trainable vacancies are split 284 train / 62 valid / 62 test (14 200 / 3 100 / 3 100 rows).
+The 408 trainable vacancies are split 306 train / 61 valid / 41 test (14 200 / 3 100 / 3 100 rows).
 
 ---
 
